@@ -94,7 +94,7 @@ class GraphService:
         for edge in connected_edges:
             self.remove_edge(edge=edge)
 
-    def outgoing(
+    def outgoing_edges_of(
         self,
         node: Node,
         relation: EdgeRelation | None = None,
@@ -107,7 +107,7 @@ class GraphService:
             if relation is None or edge.relation == relation
         ]
 
-    def incoming(
+    def incoming_edges_of(
         self,
         node: Node,
         relation: EdgeRelation | None = None,
@@ -120,24 +120,48 @@ class GraphService:
             if relation is None or edge.relation == relation
         ]
 
-    def targets(
+    def target_nodes_of(
         self,
         node: Node,
         relation: EdgeRelation | None = None,
     ) -> list[Node]:
-        outgoing_edges: list[Edge] = self.outgoing(
+        outgoing_edges: list[Edge] = self.outgoing_edges_of(
             node=node,
             relation=relation,
         )
         return [edge.target for edge in outgoing_edges]
 
-    def sources(
+    def source_nodes_of(
         self,
         node: Node,
         relation: EdgeRelation | None = None,
     ) -> list[Node]:
-        incoming_edges: list[Edge] = self.incoming(
+        incoming_edges: list[Edge] = self.incoming_edges_of(
             node=node,
             relation=relation,
         )
         return [edge.source for edge in incoming_edges]
+
+    def target_nodes_of_type[T: Node](
+        self,
+        node: Node,
+        node_type: type[T],
+        relation: EdgeRelation | None = None,
+    ) -> list[T]:
+        return [
+            related_node
+            for related_node in self.target_nodes_of(node=node, relation=relation)
+            if isinstance(related_node, node_type)
+        ]
+
+    def source_nodes_of_type[T: Node](
+        self,
+        node: Node,
+        node_type: type[T],
+        relation: EdgeRelation | None = None,
+    ) -> list[T]:
+        return [
+            related_node
+            for related_node in self.source_nodes_of(node=node, relation=relation)
+            if isinstance(related_node, node_type)
+        ]
