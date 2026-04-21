@@ -1,6 +1,6 @@
 from .base import ModifierNode
-from .tuplet import Tuplet
 from .grace_group import GraceGroup
+from .tuplet import Tuplet
 
 __all__ = (
     "GraceGroup",
