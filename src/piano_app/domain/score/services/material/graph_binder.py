@@ -25,7 +25,7 @@ class MaterialGraphBinder:
         note: Note,
     ) -> None:
         note_carriers: list[SoundCarrier] = self._graph_service.source_nodes_of_type(
-            note,
+            node=note,
             node_type=SoundCarrier,
             relation=EdgeRelation.CONTAINS,
         )
@@ -46,7 +46,7 @@ class MaterialGraphBinder:
         rest: Rest,
     ) -> None:
         rest_carriers: list[RestCarrier] = self._graph_service.source_nodes_of_type(
-            rest,
+            node=rest,
             node_type=RestCarrier,
             relation=EdgeRelation.CONTAINS,
         )
@@ -55,7 +55,7 @@ class MaterialGraphBinder:
             raise ValueError(f"Rest {rest} already belongs to a RestCarrier")
 
         contained_rests: list[Rest] = self._graph_service.target_nodes_of_type(
-            carrier,
+            node=carrier,
             node_type=Rest,
             relation=EdgeRelation.CONTAINS,
         )
@@ -75,7 +75,7 @@ class MaterialGraphBinder:
         staff: Staff,
     ) -> None:
         existing_staffs: list[Staff] = self._graph_service.target_nodes_of_type(
-            note,
+            node=note,
             node_type=Staff,
             relation=EdgeRelation.BELONGS_TO,
         )
@@ -96,7 +96,7 @@ class MaterialGraphBinder:
         staff: Staff,
     ) -> None:
         existing_staffs: list[Staff] = self._graph_service.target_nodes_of_type(
-            rest,
+            node=rest,
             node_type=Staff,
             relation=EdgeRelation.BELONGS_TO,
         )
@@ -117,7 +117,7 @@ class MaterialGraphBinder:
         voice: Voice,
     ) -> None:
         existing_voices: list[Voice] = self._graph_service.target_nodes_of_type(
-            carrier,
+            node=carrier,
             node_type=Voice,
             relation=EdgeRelation.BELONGS_TO,
         )
@@ -139,7 +139,7 @@ class MaterialGraphBinder:
     ) -> None:
         existing_time_points: list[MeasureTimePoint] = (
             self._graph_service.target_nodes_of_type(
-                carrier,
+                node=carrier,
                 node_type=MeasureTimePoint,
                 relation=EdgeRelation.STARTS_AT,
             )

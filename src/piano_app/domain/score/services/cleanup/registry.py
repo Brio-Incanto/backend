@@ -7,6 +7,9 @@ from .delete_request import DeleteRequest
 from .deletion_context import DeletionContext
 
 type CleanupRule = Callable[[DeletionContext], list[DeleteRequest]]
+type RuleDecorator = Callable[[CleanupRule], CleanupRule]
+type CleanupRuleDecoratorFactory = Callable[[type[Node]], RuleDecorator]
+type RuleRegistration = tuple[type[Node], CleanupRule]
 
 
 class CleanupRuleRegistry:
@@ -23,7 +26,10 @@ class CleanupRuleRegistry:
     ) -> None:
         self._rules_by_node_type[node_type].append(rule)
 
-    def get_rules_for(self, node: Node) -> list[CleanupRule]:
+    def get_rules_for(
+        self,
+        node: Node,
+    ) -> list[CleanupRule]:
         matching_rules: list[CleanupRule] = []
 
         for node_type, rules in self._rules_by_node_type.items():
@@ -33,13 +39,18 @@ class CleanupRuleRegistry:
         return matching_rules
 
 
-# global singleton should be reconsidered
-cleanup_rule_registry: CleanupRuleRegistry = CleanupRuleRegistry()
+def create_cleanup_rule_decorator(
+    storage: list[RuleRegistration],
+) -> CleanupRuleDecoratorFactory:
+    def cleanup_rule[T: Node](
+        apply_to_type: type[T],
+    ) -> RuleDecorator:
+        def decorator(
+            rule: CleanupRule,
+        ) -> CleanupRule:
+            storage.append((apply_to_type, rule))
+            return rule
 
+        return decorator
 
-def cleanup_rule[T: Node](node_type: type[T]) -> Callable[[CleanupRule], CleanupRule]:
-    def decorator(rule: CleanupRule) -> CleanupRule:
-        cleanup_rule_registry.register_rule(node_type=node_type, rule=rule)
-        return rule
-
-    return decorator
+    return cleanup_rule

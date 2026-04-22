@@ -109,6 +109,7 @@ class GraphService:
 
     def incoming_edges_of(
         self,
+        *,
         node: Node,
         relation: EdgeRelation | None = None,
     ) -> list[Edge]:
@@ -122,6 +123,7 @@ class GraphService:
 
     def target_nodes_of(
         self,
+        *,
         node: Node,
         relation: EdgeRelation | None = None,
     ) -> list[Node]:
@@ -133,6 +135,7 @@ class GraphService:
 
     def source_nodes_of(
         self,
+        *,
         node: Node,
         relation: EdgeRelation | None = None,
     ) -> list[Node]:
@@ -144,6 +147,7 @@ class GraphService:
 
     def target_nodes_of_type[T: Node](
         self,
+        *,
         node: Node,
         node_type: type[T],
         relation: EdgeRelation | None = None,
@@ -156,6 +160,7 @@ class GraphService:
 
     def source_nodes_of_type[T: Node](
         self,
+        *,
         node: Node,
         node_type: type[T],
         relation: EdgeRelation | None = None,
