@@ -51,6 +51,7 @@ class CleanupEngine:
                 node=node_to_delete,
                 outgoing_edges=outgoing_edges,
                 incoming_edges=incoming_edges,
+                graph_service=self._graph_service,
             )
 
             rules: list[CleanupRule] = self._cleanup_rules.get_rules_for(node_to_delete)
