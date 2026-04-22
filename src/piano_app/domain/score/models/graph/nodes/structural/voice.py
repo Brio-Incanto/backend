@@ -5,4 +5,4 @@ from .base import StructuralNode
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Voice(StructuralNode):
-    index: int
+    pass

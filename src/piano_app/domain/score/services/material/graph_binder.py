@@ -6,7 +6,11 @@ from piano_app.domain.score.models.graph.nodes.material import (
     RestCarrier,
     SoundCarrier,
 )
-from piano_app.domain.score.models.graph.nodes.structural import Staff, TimePoint, Voice
+from piano_app.domain.score.models.graph.nodes.structural import (
+    MeasureTimePoint,
+    Staff,
+    Voice,
+)
 from piano_app.domain.score.services.graph_service import GraphService
 
 
@@ -14,7 +18,7 @@ class MaterialGraphBinder:
     def __init__(self, graph_service: GraphService) -> None:
         self._graph_service: GraphService = graph_service
 
-    def add_note_to_sound_carrier(
+    def attach_note_to_sound_carrier(
         self,
         *,
         carrier: SoundCarrier,
@@ -35,7 +39,7 @@ class MaterialGraphBinder:
             relation=EdgeRelation.CONTAINS,
         )
 
-    def add_rest_to_rest_carrier(
+    def attach_rest_to_rest_carrier(
         self,
         *,
         carrier: RestCarrier,
@@ -131,18 +135,18 @@ class MaterialGraphBinder:
         self,
         *,
         carrier: Carrier,
-        time_point: TimePoint,
+        time_point: MeasureTimePoint,
     ) -> None:
-        existing_time_points: list[TimePoint] = (
+        existing_time_points: list[MeasureTimePoint] = (
             self._graph_service.target_nodes_of_type(
                 carrier,
-                node_type=TimePoint,
+                node_type=MeasureTimePoint,
                 relation=EdgeRelation.STARTS_AT,
             )
         )
 
         if existing_time_points:
-            raise ValueError(f"Carrier {carrier} already starts at a TimePoint")
+            raise ValueError(f"Carrier {carrier} already starts at a MeasureTimePoint")
 
         self._graph_service.connect(
             source=carrier,
