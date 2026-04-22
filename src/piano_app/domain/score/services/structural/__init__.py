@@ -1,7 +1,7 @@
 from .cleanup_rules import register_cleanup_rules
-from .material_service import MaterialService
+from .structural_service import StructuralService
 
 __all__ = [
-    "MaterialService",
+    "StructuralService",
     "register_cleanup_rules",
 ]

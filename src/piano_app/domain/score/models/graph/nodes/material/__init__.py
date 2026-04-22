@@ -3,6 +3,7 @@ from .note import Note
 from .rest import Rest
 from .rest_carrier import RestCarrier
 from .sound_carrier import SoundCarrier
+from .staff_element import StaffElement
 
 __all__ = (
     "Carrier",
@@ -10,4 +11,5 @@ __all__ = (
     "Rest",
     "RestCarrier",
     "SoundCarrier",
+    "StaffElement",
 )

@@ -41,7 +41,7 @@ class CleanupEngine:
                 node_to_delete
             )
             incoming_edges: list[Edge] = self._graph_service.incoming_edges_of(
-                node_to_delete
+                node=node_to_delete
             )
 
             self._delete_node_raw(node_to_delete)
