@@ -78,9 +78,6 @@ class MaterialNodeFactory:
         dot_count: int = 0,
         articulation: Articulation = Articulation.NONE,
     ) -> SoundCarrier:
-        if dot_count < 0:
-            raise ValueError("dot_count cannot be negative")
-
         return self._create(
             SoundCarrier,
             rhythmic_value=rhythmic_value,
@@ -96,9 +93,6 @@ class MaterialNodeFactory:
         dot_count: int | None = None,
         articulation: Articulation | None = None,
     ) -> SoundCarrier:
-        if dot_count is not None and dot_count < 0:
-            raise ValueError("dot_count cannot be negative")
-
         return self._update(
             carrier,
             rhythmic_value=rhythmic_value,
@@ -133,9 +127,6 @@ class MaterialNodeFactory:
         rhythmic_value: RhythmicValue,
         dot_count: int = 0,
     ) -> RestCarrier:
-        if dot_count < 0:
-            raise ValueError("dot_count cannot be negative")
-
         return self._create(
             RestCarrier,
             rhythmic_value=rhythmic_value,
@@ -149,9 +140,6 @@ class MaterialNodeFactory:
         rhythmic_value: RhythmicValue | None = None,
         dot_count: int | None = None,
     ) -> RestCarrier:
-        if dot_count is not None and dot_count < 0:
-            raise ValueError("dot_count cannot be negative")
-
         return self._update(
             carrier,
             rhythmic_value=rhythmic_value,
