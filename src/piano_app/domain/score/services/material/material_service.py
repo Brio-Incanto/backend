@@ -5,10 +5,15 @@ from piano_app.domain.score.models.graph.nodes.material import (
     RestCarrier,
     SoundCarrier,
 )
-from piano_app.domain.score.models.graph.nodes.structural import Staff, TimePoint, Voice
+from piano_app.domain.score.models.graph.nodes.structural import (
+    MeasureTimePoint,
+    Staff,
+    Voice,
+)
 from piano_app.domain.score.models.graph.notation import RhythmicValue
+from piano_app.domain.score.services.cleanup import CleanupEngine
+from piano_app.domain.score.services.cleanup.delete_request import DeleteRequest
 
-from .cleanup_service import MaterialCleanupService
 from .graph_binder import MaterialGraphBinder
 from .node_factory import MaterialNodeFactory
 
@@ -19,18 +24,18 @@ class MaterialService:
         *,
         node_factory: MaterialNodeFactory,
         graph_binder: MaterialGraphBinder,
-        cleanup_service: MaterialCleanupService,
+        cleanup_engine: CleanupEngine,
     ) -> None:
         self._node_factory: MaterialNodeFactory = node_factory
         self._graph_binder: MaterialGraphBinder = graph_binder
-        self._cleanup_service: MaterialCleanupService = cleanup_service
+        self._cleanup_engine: CleanupEngine = cleanup_engine
 
     def insert_note(
         self,
         *,
         voice: Voice,
         staff: Staff,
-        time_point: TimePoint,
+        time_point: MeasureTimePoint,
         rhythmic_value: RhythmicValue,
         staff_step: int,
         dot_count: int = 0,
@@ -43,7 +48,7 @@ class MaterialService:
             staff_step=staff_step,
         )
 
-        self._graph_binder.add_note_to_sound_carrier(
+        self._graph_binder.attach_note_to_sound_carrier(
             carrier=carrier,
             note=note,
         )
@@ -73,7 +78,7 @@ class MaterialService:
             staff_step=staff_step,
         )
 
-        self._graph_binder.add_note_to_sound_carrier(
+        self._graph_binder.attach_note_to_sound_carrier(
             carrier=carrier,
             note=note,
         )
@@ -89,7 +94,7 @@ class MaterialService:
         *,
         voice: Voice,
         staff: Staff,
-        time_point: TimePoint,
+        time_point: MeasureTimePoint,
         rhythmic_value: RhythmicValue,
         staff_step: int,
         dot_count: int = 0,
@@ -102,7 +107,7 @@ class MaterialService:
             staff_step=staff_step,
         )
 
-        self._graph_binder.add_rest_to_rest_carrier(
+        self._graph_binder.attach_rest_to_rest_carrier(
             carrier=carrier,
             rest=rest,
         )
@@ -121,20 +126,26 @@ class MaterialService:
 
         return carrier, rest
 
-    def remove_carrier(
-        self,
-        carrier: Carrier,
-    ) -> None:
-        self._cleanup_service.remove_carrier(carrier)
-
-    def remove_note(
+    def delete_note(
         self,
         note: Note,
     ) -> None:
-        self._cleanup_service.remove_note(note)
+        self._cleanup_engine.delete(
+            DeleteRequest(node=note),
+        )
 
-    def remove_rest(
+    def delete_rest(
         self,
         rest: Rest,
     ) -> None:
-        self._cleanup_service.remove_rest(rest)
+        self._cleanup_engine.delete(
+            DeleteRequest(node=rest),
+        )
+
+    def delete_carrier(
+        self,
+        carrier: Carrier,
+    ) -> None:
+        self._cleanup_engine.delete(
+            DeleteRequest(node=carrier),
+        )
