@@ -6,6 +6,7 @@ from piano_app.domain.score.models.graph.nodes.structural import (
     Voice,
 )
 from piano_app.domain.score.services.cleanup import (
+    CleanupRuleDecoratorFactory,
     CleanupRuleRegistry,
     DeleteRequest,
     DeletionContext,
@@ -17,7 +18,9 @@ from piano_app.domain.score.services.cleanup import (
 )
 
 _REGISTERED_RULES: list[RuleRegistration] = []
-cleanup_rule = create_cleanup_rule_decorator(_REGISTERED_RULES)
+cleanup_rule: CleanupRuleDecoratorFactory = create_cleanup_rule_decorator(
+    _REGISTERED_RULES
+)
 
 
 @cleanup_rule(Measure)

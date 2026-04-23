@@ -6,6 +6,7 @@ from piano_app.domain.score.models.graph.nodes.material import (
     SoundCarrier,
 )
 from piano_app.domain.score.services.cleanup import (
+    CleanupRuleDecoratorFactory,
     CleanupRuleRegistry,
     DeleteRequest,
     DeletionContext,
@@ -13,7 +14,6 @@ from piano_app.domain.score.services.cleanup import (
     create_cleanup_rule_decorator,
     remove_contained_nodes_after_node_removal,
 )
-from piano_app.domain.score.services.cleanup.registry import CleanupRuleDecoratorFactory
 
 _REGISTERED_RULES: list[RuleRegistration] = []
 cleanup_rule: CleanupRuleDecoratorFactory = create_cleanup_rule_decorator(

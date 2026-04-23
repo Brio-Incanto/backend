@@ -8,6 +8,7 @@ from .deletion_context import DeletionContext
 from .engine import CleanupEngine
 from .registry import (
     CleanupRule,
+    CleanupRuleDecoratorFactory,
     CleanupRuleRegistry,
     RuleRegistration,
     create_cleanup_rule_decorator,
@@ -16,6 +17,7 @@ from .registry import (
 __all__ = (
     "CleanupEngine",
     "CleanupRule",
+    "CleanupRuleDecoratorFactory",
     "CleanupRuleRegistry",
     "DeleteRequest",
     "DeletionContext",
