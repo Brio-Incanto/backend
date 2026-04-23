@@ -9,3 +9,7 @@ from .base import ContextNode
 class TimeSignatureChange(ContextNode):
     beats_per_measure: int
     beat_unit: RhythmicValue
+
+    def __post_init__(self) -> None:
+        if self.beats_per_measure < 1:
+            raise ValueError("Beats per measure cannot be less than 1.")

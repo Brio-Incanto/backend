@@ -9,3 +9,7 @@ from .base import ContextNode
 class TempoChange(ContextNode):
     bpm: int
     marking: TempoMarking
+
+    def __post_init__(self) -> None:
+        if self.bpm < 1:
+            raise ValueError("Tempo must be at least 1 BPM.")

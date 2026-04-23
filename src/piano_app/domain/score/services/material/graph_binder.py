@@ -29,7 +29,6 @@ class MaterialGraphBinder:
             node_type=SoundCarrier,
             relation=EdgeRelation.CONTAINS,
         )
-
         if note_carriers:
             raise ValueError(f"Note {note} already belongs to a SoundCarrier")
 
@@ -50,7 +49,6 @@ class MaterialGraphBinder:
             node_type=RestCarrier,
             relation=EdgeRelation.CONTAINS,
         )
-
         if rest_carriers:
             raise ValueError(f"Rest {rest} already belongs to a RestCarrier")
 
@@ -79,7 +77,6 @@ class MaterialGraphBinder:
             node_type=Staff,
             relation=EdgeRelation.BELONGS_TO,
         )
-
         if existing_staffs:
             raise ValueError(f"Note {note} already belongs to a Staff")
 
@@ -100,7 +97,6 @@ class MaterialGraphBinder:
             node_type=Staff,
             relation=EdgeRelation.BELONGS_TO,
         )
-
         if existing_staffs:
             raise ValueError(f"Rest {rest} already belongs to a Staff")
 
@@ -121,7 +117,6 @@ class MaterialGraphBinder:
             node_type=Voice,
             relation=EdgeRelation.BELONGS_TO,
         )
-
         if existing_voices:
             raise ValueError(f"Carrier {carrier} already belongs to a Voice")
 
@@ -144,7 +139,6 @@ class MaterialGraphBinder:
                 relation=EdgeRelation.STARTS_AT,
             )
         )
-
         if existing_time_points:
             raise ValueError(f"Carrier {carrier} already starts at a MeasureTimePoint")
 

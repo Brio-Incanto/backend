@@ -21,7 +21,6 @@ class StructuralGraphBinder:
             node_type=Measure,
             relation=EdgeRelation.CONTAINS,
         )
-
         if existing_measures:
             raise ValueError(
                 f"MeasureTimePoint {time_point} already belongs to a Measure"
@@ -47,7 +46,6 @@ class StructuralGraphBinder:
                 relation=EdgeRelation.PRECEDES,
             )
         )
-
         if existing_next_measures:
             raise ValueError(f"Measure {source_measure} already has a next measure")
 
@@ -58,7 +56,6 @@ class StructuralGraphBinder:
                 relation=EdgeRelation.PRECEDES,
             )
         )
-
         if existing_previous_measures:
             raise ValueError(f"Measure {target_measure} already has a previous measure")
 
@@ -107,7 +104,6 @@ class StructuralGraphBinder:
                 relation=EdgeRelation.PRECEDES,
             )
         )
-
         if existing_next_points:
             raise ValueError(
                 f"MeasureTimePoint {source_time_point} already has a next time point"
@@ -120,7 +116,6 @@ class StructuralGraphBinder:
                 relation=EdgeRelation.PRECEDES,
             )
         )
-
         if existing_previous_points:
             raise ValueError(
                 f"MeasureTimePoint {target_time_point} "
