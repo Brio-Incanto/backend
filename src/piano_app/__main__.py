@@ -1,17 +1,13 @@
-import asyncio
+import uvicorn
 
-from piano_app.bootstrap.settings import Settings, load_environment, load_settings
+from piano_app.bootstrap.container import build_app
+from piano_app.bootstrap.settings import load_environment
 
 
-async def main() -> None:
+def main() -> None:
     load_environment()
-
-    try:
-        settings: Settings = load_settings()
-    except Exception as exc:
-        print(exc)
-        return
+    uvicorn.run(build_app(), host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -4,14 +4,11 @@ from typing import Any, Protocol
 class MutationSink(Protocol):
     """Port through which domain entities perform reversible mutations.
 
-    Domain mutators never touch their collections or fields directly; they
-    route every change through a sink. The default sink applies changes in
-    place and records nothing; the mutation service passes a journaling sink so
-    the same changes become undoable. The domain depends only on this port —
-    never on the journal or the mutation service.
+    It is intended to serve as a single mutation entry point to record all changes for
+    undo and redo operations.
     """
 
-    def set_field(self, obj: object, name: str, value: object) -> None: ...
+    def set_field(self, target: object, field_name: str, value: object) -> None: ...
 
     def list_append(self, target: list[Any], item: Any) -> None: ...
 
@@ -21,10 +18,10 @@ class MutationSink(Protocol):
 
 
 class _DirectMutationSink:
-    """Applies mutations immediately, recording nothing (no undo)."""
+    """Applies mutations immediately, recording nothing."""
 
-    def set_field(self, obj: object, name: str, value: object) -> None:
-        setattr(obj, name, value)
+    def set_field(self, target: object, field_name: str, value: object) -> None:
+        setattr(target, field_name, value)
 
     def list_append(self, target: list[Any], item: Any) -> None:
         target.append(item)

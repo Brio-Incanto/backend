@@ -1,10 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from piano_app.domain.score.models.material.primitive import Note
 from piano_app.domain.score.models.notation import (
+    Accidental,
     DottedRhythmicValue,
     Fingering,
-    Pitch,
 )
 from piano_app.domain.score.models.structural import (
     Measure,
@@ -12,14 +12,16 @@ from piano_app.domain.score.models.structural import (
     Staff,
     Voice,
 )
-from piano_app.domain.score.services.mutation.instructions import ResultRef
 from piano_app.domain.score.services.mutation.instructions.requests.base import (
-    MutationRequest,
+    CreateMutationRequest,
+    DeleteMutationRequest,
 )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class CreateNoteRequest(MutationRequest):
+class CreateNoteRequest(CreateMutationRequest[Note]):
+    """A request to create a note in a voice, on a staff, at a measure position."""
+
     voice: Voice
     staff: Staff
     measure: Measure
@@ -27,12 +29,10 @@ class CreateNoteRequest(MutationRequest):
     position: MeasurePosition
     written_value: DottedRhythmicValue
     staff_step: int
-    pitch: Pitch
-
+    accidental: Accidental = Accidental.NONE
     fingering: Fingering = Fingering.NONE
 
-    out: ResultRef[Note] = field(default_factory=ResultRef)
 
-    @property
-    def produced_ref(self) -> ResultRef[Note]:
-        return self.out
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteNoteRequest(DeleteMutationRequest[Note]):
+    """A request to delete a note."""

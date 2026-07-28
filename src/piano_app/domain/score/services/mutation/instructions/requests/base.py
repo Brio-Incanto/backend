@@ -1,24 +1,40 @@
-from collections.abc import Hashable
 from dataclasses import dataclass
 from typing import Any
 
 from piano_app.domain.score.models import ScoreEntity
-from piano_app.domain.score.services.mutation.instructions.base import (
-    MutationInstruction,
-)
 from piano_app.domain.score.services.mutation.instructions.refs import ResultRef
+from piano_app.domain.shared.abstract import abstract
 
 
+@abstract
 @dataclass(frozen=True, slots=True, kw_only=True)
-class MutationRequest(MutationInstruction):
+class MutationRequest:
+    """Role base: a work item expanded by its analyzer."""
+
     @property
     def produced_ref(self) -> ResultRef[Any] | None:
-        """The reference to be passed to the action that is produced by this request."""
-        return None
+        raise NotImplementedError
+
+
+@abstract
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateMutationRequest[T: ScoreEntity](MutationRequest):
+    """A request that creates an entity, published through ``out``."""
+
+    out: ResultRef[T]
 
     @property
-    def identity_key(self) -> tuple[type[ScoreEntity], Hashable] | None:
-        """The key that gives an entity unique identity for deduplication.
-        None means that an entity is always emitted (no deduplication).
-        """
+    def produced_ref(self) -> ResultRef[T]:
+        return self.out
+
+
+@abstract
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteMutationRequest[T: ScoreEntity](MutationRequest):
+    """A request that removes an existing ``target``."""
+
+    target: T
+
+    @property
+    def produced_ref(self) -> None:
         return None

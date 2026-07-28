@@ -6,33 +6,23 @@ from piano_app.domain.score.models.notation import (
 )
 
 
-# TODO rewrite docstrings
 class RhythmicSizeMapper:
-    """Normalises an arbitrary duration into notatable rhythmic sizes.
+    """Normalises an arbitrary duration into notatable rhythmic sizes."""
 
-    Given a duration, it returns either a single ``RhythmicSize``
-    (a dotted value) or a multi-size decomposition (the rests/notes a duration is
-    written as). A decomposition is built greedily, largest-first, under two
-    constraints: at most one/two dots per value, and values within one
-    decomposition may not differ by more than ``_MAX_DENOMINATOR_JUMP`` times the
-    largest selected value (no whole-note + thirty-second mixes).
-    """
-
-    # Max dots allowed on a single normalised size vs a size inside a multi-size
-    # decomposition.
-    _MAX_SINGLE_SIZE_DOTS_COUNT = 2
-    _MAX_MULTI_SIZE_DOTS_COUNT = 1
-    # How much smaller (by denominator) a value may be than the largest selected.
-    _MAX_DENOMINATOR_JUMP = 4
-    # The shortest note in the model; dotting cannot reach below it (members are
-    # ints, so this compares directly against a numeric "reach").
-    _SMALLEST_NOTE = max(RhythmicValue)
+    # Max dots allowed on a single normalized size
+    _MAX_SINGLE_SIZE_DOTS_COUNT: int = 2
+    # Max dots allowed on a multi-size decomposition
+    _MAX_MULTI_SIZE_DOTS_COUNT: int = 1
+    # How much smaller (by denominator) a value may be than the largest selected
+    _MAX_DENOMINATOR_JUMP: int = 4
+    # The shortest note in the model, dotting cannot reach below it
+    _SMALLEST_NOTE: int = max(RhythmicValue)
 
     def spell_duration(self, *, duration: Fraction) -> list[DottedRhythmicValue]:
-        """Return the rhythmic sizes that spell ``duration``.
+        """Return the rhythmic sizes that spell duration
 
         Prefers a single dotted value; falls back to a multi-size decomposition.
-        Raises ``ValueError`` if the duration cannot be normalised under the
+        Raises ``ValueError`` if the duration cannot be normalized under the
         constraints.
         """
         if duration <= 0:

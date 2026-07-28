@@ -1,14 +1,15 @@
-from piano_app.domain.score.models import ScoreEntity
 from piano_app.domain.score.models.material.carrier import NoteCarrier
 from piano_app.domain.score.models.material.carrier_owner import CarrierOwner
 from piano_app.domain.score.models.mutation_sink import MutationSink
+from piano_app.domain.score.services.mutation.engine.handlers.base import MutationHandler
+from piano_app.domain.score.services.mutation.engine.resolver import Resolver
 from piano_app.domain.score.services.mutation.instructions.actions.material.note_carrier import (
     CreateNoteCarrierAction,
+    DeleteNoteCarrierAction,
 )
-from piano_app.domain.score.services.mutation.engine.resolver import Resolver
 
 
-class CreateNoteCarrierHandler:
+class CreateNoteCarrierHandler(MutationHandler[CreateNoteCarrierAction]):
     """Creates a note carrier on its owner (resolved from the environment)."""
 
     def handle(
@@ -17,7 +18,7 @@ class CreateNoteCarrierHandler:
         action: CreateNoteCarrierAction,
         resolve: Resolver,
         sink: MutationSink,
-    ) -> ScoreEntity | None:
+    ) -> NoteCarrier:
         owner: CarrierOwner = resolve(action.owner)
         carrier: NoteCarrier = NoteCarrier.create(
             owner=owner,
@@ -25,3 +26,18 @@ class CreateNoteCarrierHandler:
             sink=sink,
         )
         return carrier
+
+
+class DeleteNoteCarrierHandler(MutationHandler[DeleteNoteCarrierAction]):
+    """Detaches a note carrier from its owner."""
+
+    def handle(
+        self,
+        *,
+        action: DeleteNoteCarrierAction,
+        resolve: Resolver,
+        sink: MutationSink,
+    ) -> None:
+        note_carrier: NoteCarrier = action.target
+        note_carrier.detach(sink=sink)
+        return None

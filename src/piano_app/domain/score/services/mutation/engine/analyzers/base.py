@@ -1,20 +1,19 @@
-from typing import Protocol
+from abc import ABC, abstractmethod
 
+from piano_app.domain.score.services.mutation.engine.buffer import EmitBuffer
+from piano_app.domain.score.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.services.mutation.instructions import MutationRequest
-from piano_app.domain.score.services.mutation.engine.scope import (
-    EmitBuffer,
-    PlanningScope,
-)
 
 
-class MutationAnalyzer[R: MutationRequest](Protocol):
-    """Decomposes one request into ordered plan items.
+class MutationAnalyzer[R: MutationRequest](ABC):
+    """Decomposes one request into ordered work items.
 
     An analyzer may emit further requests (recursive decomposition on *other*
-    entities), terminal actions on *its own* entity, and may intern shared
-    producers through ``scope``. The order it returns items in is the execution
-    order. To abort the whole plan, raise ``PlanRejectedError``; an empty list
+    entities) and one terminal action on *its own* entity, into an ``EmitBuffer``
+    it creates and returns. The order it returns items in is the execution order.
+    To abort the whole gesture, raise ``MutationRejectedError``. An empty buffer
     is a legitimate no-op.
     """
 
-    def analyze(self, *, request: R, scope: PlanningScope) -> EmitBuffer: ...
+    @abstractmethod
+    def analyze(self, *, request: R, resolver: ResolveBound) -> EmitBuffer: ...

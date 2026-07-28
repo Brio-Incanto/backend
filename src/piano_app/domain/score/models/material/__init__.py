@@ -1,15 +1,13 @@
-from .base_carrier import Carrier
-from .note import Note
-from .rest import Rest
-from .rest_carrier import RestCarrier
-from .sound_carrier import SoundCarrier
-from .staff_element import StaffElement
+from .carrier import Carrier, NoteCarrier, RestCarrier
+from .carrier_owner import CarrierOwner
+from .primitive import MusicalItem, Note, Rest
 
 __all__ = (
     "Carrier",
+    "CarrierOwner",
+    "MusicalItem",
     "Note",
+    "NoteCarrier",
     "Rest",
     "RestCarrier",
-    "SoundCarrier",
-    "StaffElement",
 )

@@ -5,6 +5,7 @@ from piano_app.domain.score.models.material.primitive import Rest
 from piano_app.domain.score.models.structural import Staff
 from piano_app.domain.score.services.mutation.instructions.actions.base import (
     CreateMutationAction,
+    DeleteMutationAction,
 )
 from piano_app.domain.score.services.mutation.instructions.refs import Bound
 
@@ -16,3 +17,8 @@ class CreateRestAction(CreateMutationAction[Rest]):
     rest_carrier: Bound[RestCarrier]
     staff: Staff
     staff_step: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteRestAction(DeleteMutationAction[Rest]):
+    """Deletes a rest."""

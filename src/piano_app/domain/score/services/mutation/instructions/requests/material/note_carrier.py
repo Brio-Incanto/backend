@@ -1,16 +1,18 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from piano_app.domain.score.models.material.carrier import NoteCarrier
 from piano_app.domain.score.models.notation import Articulation, DottedRhythmicValue
 from piano_app.domain.score.models.structural import Measure, MeasurePosition, Voice
-from piano_app.domain.score.services.mutation.instructions.refs import ResultRef
 from piano_app.domain.score.services.mutation.instructions.requests.base import (
-    MutationRequest,
+    CreateMutationRequest,
+    DeleteMutationRequest,
 )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class CreateNoteCarrierRequest(MutationRequest):
+class CreateNoteCarrierRequest(CreateMutationRequest[NoteCarrier]):
+    """A request to create a note carrier for a voice at a measure position."""
+
     voice: Voice
     measure: Measure
 
@@ -18,8 +20,7 @@ class CreateNoteCarrierRequest(MutationRequest):
     written_value: DottedRhythmicValue
     articulation: Articulation = Articulation.NONE
 
-    out: ResultRef[NoteCarrier] = field(default_factory=ResultRef)
 
-    @property
-    def produced_ref(self) -> ResultRef[NoteCarrier]:
-        return self.out
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteNoteCarrierRequest(DeleteMutationRequest[NoteCarrier]):
+    """A request to delete a note carrier."""

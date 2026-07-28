@@ -1,152 +1,98 @@
-from piano_app.domain.score.models.material.carrier import (
-    Carrier,
-    NoteCarrier,
-    RestCarrier,
-)
-from piano_app.domain.score.models.notation import Articulation, DottedRhythmicValue
-from piano_app.domain.score.models.structural import (
-    Measure,
-    MeasurePosition,
-    TemporalAnchor,
-    Voice,
-)
-from piano_app.domain.score.models.structural.rhythm.metric import LeafRhythmicContainer
-from piano_app.domain.score.services.helpers.hierarchy_traversal import flatten
-from piano_app.domain.score.services.mutation.instructions import ResultRef
-from piano_app.domain.score.services.mutation.instructions.actions.material.note import (
+from piano_app.domain.score.models.material import Carrier
+from piano_app.domain.score.models.material.carrier import NoteCarrier
+from piano_app.domain.score.models.material.primitive import Note
+from piano_app.domain.score.models.structural.rhythm import LeafRhythmicContainer
+from piano_app.domain.score.services.helpers import find_leaf_at
+from piano_app.domain.score.services.mutation.engine.analyzers.base import MutationAnalyzer
+from piano_app.domain.score.services.mutation.engine.buffer import EmitBuffer
+from piano_app.domain.score.services.mutation.engine.resolver import ResolveBound
+from piano_app.domain.score.services.mutation.instructions import Bound, ResultRef
+from piano_app.domain.score.services.mutation.instructions.actions.material import (
     CreateNoteAction,
+    DeleteNoteAction,
 )
 from piano_app.domain.score.services.mutation.instructions.requests.material import (
-    CreateNoteRequest,
-)
-from piano_app.domain.score.services.mutation.instructions.requests.material.note_carrier import (
     CreateNoteCarrierRequest,
+    CreateNoteRequest,
+    DeleteNoteRequest,
 )
-from piano_app.domain.score.services.mutation.engine.scope import (
-    EmitBuffer,
-    PlanningScope,
+from piano_app.domain.score.services.mutation.instructions.requests.relations import (
+    DeleteRelationRequest,
 )
 
 
-class CreateNoteAnalyzer:
-    """Creates a note for the requested voice / measure / position.
+class CreateNoteAnalyzer(MutationAnalyzer[CreateNoteRequest]):
+    """Decides where to create a note in the requested voice slot.
 
-    Top of the create chain: it only asks whether it can chord-join an existing
-    note carrier; everything else (the slot's size, neighbours) is delegated to
-    the carrier request.
+    A same-size leaf with a note carrier triggers a chord join; every other slot
+    state delegates creation of a suitable carrier.
     """
 
-    def analyze(
-        self,
-        *,
-        request: CreateNoteRequest,
-        scope: PlanningScope,
-    ) -> EmitBuffer:
-        to_emit: EmitBuffer = scope.create_buffer()
+    def analyze(self, *, request: CreateNoteRequest, resolver: ResolveBound) -> EmitBuffer:
+        buffer: EmitBuffer = EmitBuffer(request=request)
 
-        anchor: TemporalAnchor | None = self._find_anchor(
+        leaf: LeafRhythmicContainer | None = find_leaf_at(
             measure=request.measure,
             position=request.position,
+            voice=request.voice,
         )
+        carrier: Carrier | None = leaf.carrier if leaf is not None else None
 
-        if anchor is not None:
-            leaf: LeafRhythmicContainer | None = self._find_leaf(
-                anchor=anchor,
-                voice=request.voice,
+        # chord-join only when the slot already holds a same-size note carrier;
+        # everything else (rest carrier, different size, no leaf) is the carrier's call
+        note_carrier: Bound[NoteCarrier]
+        if (
+            leaf is not None
+            and leaf.written_size.value == request.written_value
+            and leaf.written_size.count == 1
+            and isinstance(carrier, NoteCarrier)
+        ):
+            # TODO:
+            #   PITCH-VALIDATION (deferred — pitch is not in v1): when the carrier already
+            #   holds a note at the SAME pitch, chord-duplicate is forbidden → reject (or
+            #   replace); cross-voice unison stays allowed. See [[pitch-and-voice-policy]].
+            #   No-op until pitch lands.
+            note_carrier = carrier
+        else:
+            note_carrier = ResultRef[NoteCarrier]()
+            buffer.incorporate(
+                item=CreateNoteCarrierRequest(
+                    voice=request.voice,
+                    measure=request.measure,
+                    position=request.position,
+                    written_value=request.written_value,
+                    out=note_carrier,
+                ),
             )
 
-            if leaf is not None and self._has_same_written_size(
-                leaf=leaf,
-                written_value=request.written_value,
-            ):
-                carrier: Carrier | None = leaf.carrier
-                if isinstance(carrier, NoteCarrier):
-                    self._chord_join(
-                        buffer=to_emit,
-                        note_carrier=carrier,
-                        request=request,
-                    )
-                    return to_emit
-
-                # TODO handle attachment to the existing leaf
-                if not isinstance(carrier, RestCarrier):
-                    raise ValueError(f"Unexpected carrier type: {type(carrier)}")
-
-        self._create_note_on_new_carrier(
-            buffer=to_emit,
-            request=request,
-        )
-        return to_emit
-
-    def _chord_join(
-        self,
-        *,
-        buffer: EmitBuffer,
-        note_carrier: NoteCarrier,
-        request: CreateNoteRequest,
-    ) -> None:
-        buffer.incorporate_create(
+        buffer.incorporate(
             item=CreateNoteAction(
                 note_carrier=note_carrier,
                 staff=request.staff,
                 staff_step=request.staff_step,
-                pitch=request.pitch,
+                accidental=request.accidental,
                 fingering=request.fingering,
+                out=request.out,
             ),
         )
 
-    def _create_note_on_new_carrier(
-        self,
-        *,
-        buffer: EmitBuffer,
-        request: CreateNoteRequest,
-    ) -> None:
-        carrier_ref: ResultRef[NoteCarrier] = buffer.incorporate_create(
-            item=CreateNoteCarrierRequest(
-                voice=request.voice,
-                measure=request.measure,
-                position=request.position,
-                written_value=request.written_value,
-                articulation=Articulation.NONE,
-                out=ResultRef(),
-            ),
-        )
-        buffer.incorporate_create(
-            item=CreateNoteAction(
-                note_carrier=carrier_ref,
-                staff=request.staff,
-                staff_step=request.staff_step,
-                pitch=request.pitch,
-                fingering=request.fingering,
-            ),
-        )
+        return buffer
 
-    def _find_anchor(
-        self,
-        *,
-        measure: Measure,
-        position: MeasurePosition,
-    ) -> TemporalAnchor | None:
-        return next(
-            (anchor for anchor in measure.anchors if anchor.position == position),
-            None,
-        )
 
-    def _find_leaf(
-        self,
-        *,
-        anchor: TemporalAnchor,
-        voice: Voice,
-    ) -> LeafRhythmicContainer | None:
-        return next(
-            (leaf for leaf in flatten(voice) if leaf.anchor is anchor),
-            None,
-        )
+class DeleteNoteAnalyzer(MutationAnalyzer[DeleteNoteRequest]):
+    """Decides the note's deletion cascade.
 
-    def _has_same_written_size(
-        self,
-        *,
-        leaf: LeafRhythmicContainer,
-        written_value: DottedRhythmicValue,
-    ) -> bool:
-        return leaf.written_size.value == written_value and leaf.written_size.count == 1
+    Note-to-note relations are deleted before the note. Cleanup of an empty
+    carrier is deferred to the mutation boundary.
+    """
+
+    def analyze(self, *, request: DeleteNoteRequest, resolver: ResolveBound) -> EmitBuffer:
+        buffer: EmitBuffer = EmitBuffer(request=request)
+        note: Note = request.target
+
+        for note_relation in note.relations:
+            buffer.incorporate(item=DeleteRelationRequest(target=note_relation))
+
+        buffer.incorporate(item=DeleteNoteAction(target=note))
+
+        return buffer

@@ -1,25 +1,144 @@
-from piano_app.domain.score.services.mutation.instructions.requests.rhythmic.leaf import (
-    CreateLeafRhythmicContainerRequest,
+from piano_app.domain.score.models.material import NoteCarrier, RestCarrier
+from piano_app.domain.score.models.structural import TemporalAnchor
+from piano_app.domain.score.models.structural.rhythm import (
+    GroupRhythmicContainer,
+    LeafRhythmicContainer,
+    RhythmicContainer,
 )
-from piano_app.domain.score.services.mutation.engine.scope import (
-    EmitBuffer,
-    PlanningScope,
+from piano_app.domain.score.models.structural.rhythm.metric.parent import RhythmicContainerParent
+from piano_app.domain.score.services.helpers import Interval, find_anchor_at, global_position
+from piano_app.domain.score.services.helpers.searching import (
+    find_intersections,
+    locate_in_deepest_scope,
+)
+from piano_app.domain.score.services.mutation.engine.analyzers.base import MutationAnalyzer
+from piano_app.domain.score.services.mutation.engine.buffer import EmitBuffer
+from piano_app.domain.score.services.mutation.engine.resolver import ResolveBound
+from piano_app.domain.score.services.mutation.instructions import (
+    Bound,
+    MutationRejectedError,
+    ResultRef,
+)
+from piano_app.domain.score.services.mutation.instructions.actions.rhythmic import (
+    CreateLeafAction,
+    DeleteLeafAction,
+)
+from piano_app.domain.score.services.mutation.instructions.requests.material import (
+    DeleteNoteCarrierRequest,
+    DeleteRestCarrierRequest,
+)
+from piano_app.domain.score.services.mutation.instructions.requests.rhythmic import (
+    CreateLeafRequest,
+    DeleteLeafRequest,
+    DeleteRhythmicGroupRequest,
+)
+from piano_app.domain.score.services.mutation.instructions.requests.temporal import (
+    CreateTemporalAnchorRequest,
 )
 
 
-class CreateLeafAnalyzer:
-    """Leaf level: the spatial decision (how inserting a leaf of size S affects
-    neighbours, who to delete) plus anchor find-or-create.
+class CreateLeafAnalyzer(MutationAnalyzer[CreateLeafRequest]):
+    """Decides placement and displacement for a new metric leaf.
 
-    TODO: not implemented — emits the leaf action and resolves the anchor via
-     ``scope.emit_create`` (find-or-create by position), raising on unsupported
-     insertions (cross-measure, front-trim). See plan D.
+    Its start selects the deepest containing rhythmic scope; spilling across that
+    scope rejects the request. The anchor is reused or created, and intersecting
+    sibling containers are deleted before the leaf is created.
     """
 
     def analyze(
         self,
         *,
-        request: CreateLeafRhythmicContainerRequest,
-        scope: PlanningScope,
+        request: CreateLeafRequest,
+        resolver: ResolveBound,
     ) -> EmitBuffer:
-        raise NotImplementedError
+        buffer: EmitBuffer = EmitBuffer(request=request)
+
+        existing_anchor: TemporalAnchor | None = find_anchor_at(
+            measure=request.measure,
+            position=request.position,
+        )
+
+        anchor: Bound[TemporalAnchor]
+        if existing_anchor is not None:
+            anchor = existing_anchor
+        else:
+            anchor = ResultRef[TemporalAnchor]()
+            buffer.incorporate(
+                item=CreateTemporalAnchorRequest(
+                    measure=request.measure,
+                    position=request.position,
+                    out=anchor,
+                )
+            )
+
+        # The returned interval carries the deepest scope and coordinates in that scope.
+        try:
+            interval: Interval = locate_in_deepest_scope(
+                scope=request.voice,
+                start=global_position(
+                    measure=request.measure,
+                    position=request.position,
+                ),
+                written_length=request.size.fraction,
+            )
+        except ValueError as error:
+            raise MutationRejectedError("Leaf straddles a group boundary.") from error
+
+        parent: RhythmicContainerParent = interval.scope
+        to_remove: list[RhythmicContainer] = find_intersections(interval=interval)
+
+        for item in to_remove:
+            if isinstance(item, LeafRhythmicContainer):
+                buffer.incorporate(item=DeleteLeafRequest(target=item))
+            elif isinstance(item, GroupRhythmicContainer):
+                buffer.incorporate(item=DeleteRhythmicGroupRequest(target=item))
+            else:
+                raise ValueError(f"Unknown container type: {type(item)}")
+
+        buffer.incorporate(
+            item=CreateLeafAction(
+                parent=parent,
+                anchor=anchor,
+                size=request.size,
+                out=request.out,
+            ),
+        )
+
+        return buffer
+
+
+class DeleteLeafAnalyzer(MutationAnalyzer[DeleteLeafRequest]):
+    """Decides the metric leaf's deletion cascade.
+
+    An attached note or rest carrier is deleted before the leaf; grace-group
+    deletion is not implemented yet.
+    """
+
+    def analyze(
+        self,
+        *,
+        request: DeleteLeafRequest,
+        resolver: ResolveBound,
+    ) -> EmitBuffer:
+        buffer: EmitBuffer = EmitBuffer(request=request)
+        leaf: LeafRhythmicContainer = request.target
+
+        # TODO later
+        if leaf.grace_before is not None:
+            pass
+
+        if leaf.grace_after is not None:
+            pass
+
+        carrier = leaf.carrier
+        if carrier is not None:
+            if isinstance(carrier, NoteCarrier):
+                buffer.incorporate(item=DeleteNoteCarrierRequest(target=carrier))
+            elif isinstance(carrier, RestCarrier):
+                buffer.incorporate(item=DeleteRestCarrierRequest(target=carrier))
+            else:
+                raise ValueError(f"Unknown carrier type: {type(carrier)}")
+
+        buffer.incorporate(item=DeleteLeafAction(target=leaf))
+
+        return buffer

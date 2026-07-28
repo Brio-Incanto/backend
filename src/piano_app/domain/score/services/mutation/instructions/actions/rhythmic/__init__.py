@@ -1,3 +1,4 @@
-from .leaf import CreateLeafAction
+from .leaf import CreateLeafAction, DeleteLeafAction
+from .rhythmic_group import DeleteRhythmicGroupAction
 
-__all__ = ("CreateLeafAction",)
+__all__ = ("CreateLeafAction", "DeleteLeafAction", "DeleteRhythmicGroupAction")

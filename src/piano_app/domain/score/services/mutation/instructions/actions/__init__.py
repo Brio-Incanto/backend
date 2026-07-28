@@ -1,9 +1,3 @@
-from .base import CreateMutationAction, DeleteMutationAction, MutationAction
-from .relation import DeleteRelationAction
+from .base import MutationAction
 
-__all__ = (
-    "CreateMutationAction",
-    "DeleteMutationAction",
-    "DeleteRelationAction",
-    "MutationAction",
-)
+__all__ = ("MutationAction",)

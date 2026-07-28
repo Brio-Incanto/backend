@@ -18,7 +18,7 @@ from piano_app.domain.score.services.mutation.instructions import (
 )
 
 from .undo_redo_stack import UndoRedoStack
-from .view import ScoreEditView, build_score_edit_view
+from .view import ScoreEditView
 
 
 class ScoreEditService:
@@ -43,11 +43,16 @@ class ScoreEditService:
         self._store: DraftStore = store
         self._undo: defaultdict[str, UndoRedoStack] = undo
 
-    def get_document(self, *, draft_id: str) -> ScoreEditView:
+    def get_document(self, *, draft_id: str) -> dict[str, object]:
         document: ScoreDocument = self._store.load(draft_id=draft_id)
-        return build_score_edit_view(document=document, score_id=draft_id)
+        return ScoreEditView(document=document).jsonify()
 
-    def insert_note(self, *, draft_id: str, command: InsertNoteCommand) -> ScoreEditView:
+    def insert_note(
+        self,
+        *,
+        draft_id: str,
+        command: InsertNoteCommand,
+    ) -> dict[str, object]:
         document: ScoreDocument = self._store.load(draft_id=draft_id)
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_insert_note(
@@ -58,9 +63,14 @@ class ScoreEditService:
         except MutationRejectedError as error:
             raise EditRejectedError(reason=error.reason) from error
 
-        return build_score_edit_view(document=document, score_id=draft_id)
+        return ScoreEditView(document=document).jsonify()
 
-    def tie_notes(self, *, draft_id: str, command: TieNotesCommand) -> ScoreEditView:
+    def tie_notes(
+        self,
+        *,
+        draft_id: str,
+        command: TieNotesCommand,
+    ) -> dict[str, object]:
         document: ScoreDocument = self._store.load(draft_id=draft_id)
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_tie_notes(
@@ -71,9 +81,14 @@ class ScoreEditService:
         except MutationRejectedError as error:
             raise EditRejectedError(reason=error.reason) from error
 
-        return build_score_edit_view(document=document, score_id=draft_id)
+        return ScoreEditView(document=document).jsonify()
 
-    def delete_batch(self, *, draft_id: str, command: DeleteBatchCommand) -> ScoreEditView:
+    def delete_batch(
+        self,
+        *,
+        draft_id: str,
+        command: DeleteBatchCommand,
+    ) -> dict[str, object]:
         document: ScoreDocument = self._store.load(draft_id=draft_id)
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_delete_batch(
@@ -84,21 +99,21 @@ class ScoreEditService:
         except MutationRejectedError as error:
             raise EditRejectedError(reason=error.reason) from error
 
-        return build_score_edit_view(document=document, score_id=draft_id)
+        return ScoreEditView(document=document).jsonify()
 
-    def undo(self, *, draft_id: str) -> ScoreEditView:
+    def undo(self, *, draft_id: str) -> dict[str, object]:
         document: ScoreDocument = self._store.load(draft_id=draft_id)
         if not self._undo[draft_id].undo():
             raise EditHistoryEmptyError(operation="undo")
 
-        return build_score_edit_view(document=document, score_id=draft_id)
+        return ScoreEditView(document=document).jsonify()
 
-    def redo(self, *, draft_id: str) -> ScoreEditView:
+    def redo(self, *, draft_id: str) -> dict[str, object]:
         document: ScoreDocument = self._store.load(draft_id=draft_id)
         if not self._undo[draft_id].redo():
             raise EditHistoryEmptyError(operation="redo")
 
-        return build_score_edit_view(document=document, score_id=draft_id)
+        return ScoreEditView(document=document).jsonify()
 
     def _run(
         self,

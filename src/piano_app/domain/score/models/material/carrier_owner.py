@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING, Protocol
 
+from piano_app.domain.score.models.mutation_sink import DIRECT_SINK, MutationSink
+
 if TYPE_CHECKING:
     from piano_app.domain.score.models.material.carrier import Carrier
-    from piano_app.domain.score.models.mutation_sink import MutationSink
 
 
 class CarrierOwner(Protocol):
@@ -15,8 +16,23 @@ class CarrierOwner(Protocol):
     against the concrete classes.
     """
 
-    carrier: Carrier | None
+    # None while the owner is transiently empty — during construction, or between
+    # a carrier's detach and the cleanup boundary that reaps the empty owner
+    _carrier: Carrier | None
 
-    def attach_carrier(self, *, carrier: Carrier, sink: MutationSink) -> None: ...
+    @property
+    def carrier(self) -> Carrier | None: ...
 
-    def detach_carrier(self, *, carrier: Carrier, sink: MutationSink) -> None: ...
+    def attach_carrier(
+        self,
+        *,
+        carrier: Carrier,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None: ...
+
+    def detach_carrier(
+        self,
+        *,
+        carrier: Carrier,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None: ...

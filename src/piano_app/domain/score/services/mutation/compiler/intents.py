@@ -44,6 +44,14 @@ class InsertNoteIntent(Protocol):
     def fingering(self) -> int: ...
 
 
+class TieNotesIntent(Protocol):
+    @property
+    def start_note_id(self) -> str: ...
+
+    @property
+    def end_note_id(self) -> str: ...
+
+
 class DeleteBatchIntent(Protocol):
     @property
     def entity_ids(self) -> Sequence[str]: ...
