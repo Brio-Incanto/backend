@@ -1,5 +1,5 @@
-class DraftNotFoundError(Exception):
-    """Raised when a draft id has no working copy in the store."""
+class EditDraftNotFoundError(Exception):
+    """Raised when an edit targets a draft id that has no working copy."""
 
     def __init__(self, *, draft_id: str) -> None:
         super().__init__(f"No draft with id {draft_id!r}.")
