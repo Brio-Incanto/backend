@@ -1,10 +1,6 @@
-class PlanRejectedError(Exception):
-    """Raised by an analyzer when the requested operation is impossible.
-
-    The planner lets it propagate; the whole plan is discarded before any
-    mutation happens, so no rollback is required. This is the explicit
-    "reject" channel — an empty result from an analyzer means a legitimate
-    no-op, not a rejection.
+class MutationRejectedError(Exception):
+    """Raised when a mutation is rejected because it is
+    impossible to perform or the domain invariant is violated.
     """
 
     def __init__(self, reason: str) -> None:

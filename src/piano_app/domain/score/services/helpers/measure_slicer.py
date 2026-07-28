@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from fractions import Fraction
 
-from piano_app.domain.score.models.structural import Measure, MeasurePosition
-from piano_app.domain.score.services.rhythmic_size.primitives.interval import Interval
-from piano_app.domain.score.services.rhythmic_size.primitives.space import (
-    measure_global_interval,
+from piano_app.domain.score.models.structural import Measure, MeasurePosition, Voice
+
+from .interval import Interval
+from .scope import (
+    build_measure_interval_map,
     measure_origin,
+    translate_to_root,
 )
 
 
@@ -36,58 +38,35 @@ class MeasureSlice:
         return MeasurePosition.of_fraction(fraction=self.global_end_position - global_measure_start)
 
 
-class MeasureSlicer:
-    def slice(
-        self,
-        *,
-        interval: Interval,
-        origin_measure: Measure,
-    ) -> list[MeasureSlice]:
-        measure_interval_map: dict[Measure, GlobalInterval] = self._build_measure_interval_map(
-            origin_measure=origin_measure
+def slice_measures(
+    *,
+    interval: Interval,
+    origin_measure: Measure,
+) -> list[MeasureSlice]:
+    root_interval: Interval = translate_to_root(interval=interval)
+    # translate_to_root recurses up to the voice, so the root scope is always the voice
+    root_scope = root_interval.scope
+    if not isinstance(root_scope, Voice):
+        raise ValueError("Root interval scope must be a voice.")
+    voice: Voice = root_scope
+
+    measure_interval_map: dict[Measure, Interval] = build_measure_interval_map(
+        origin_measure=origin_measure,
+        voice=voice,
+    )
+
+    slices: list[MeasureSlice] = []
+    for measure, measure_interval in measure_interval_map.items():
+        common_part: Interval | None = measure_interval.intersection(root_interval)
+        if common_part is None:
+            continue
+
+        slices.append(
+            MeasureSlice(
+                measure=measure,
+                global_start_position=common_part.start,
+                global_end_position=common_part.end,
+            )
         )
 
-        slices: list[MeasureSlice] = []
-        for measure, measure_interval in measure_interval_map.items():
-            common_part: Interval | None = measure_interval.interval.intersection(
-                interval_to_slice.interval
-            )
-            if common_part is None:
-                continue
-
-            slices.append(
-                MeasureSlice(
-                    measure=measure,
-                    global_start_position=common_part.start,
-                    global_end_position=common_part.end,
-                )
-            )
-
-        return slices
-
-    # inefficient due to n + 1
-    # global interval for each measure is calculated
-    # by finding the cumulative sum of all preceding without caching
-    def _build_measure_interval_map(
-        self,
-        *,
-        origin_measure: Measure,
-    ) -> dict[Measure, GlobalInterval]:
-        measure_interval_map: dict[Measure, GlobalInterval] = {}
-
-        # add all preceding measures to the map
-        previous: Measure | None = origin_measure.prev_measure
-        while previous is not None:
-            measure_interval_map[previous] = measure_global_interval(measure=previous)
-            previous = previous.prev_measure
-
-        # add the origin measure to the map
-        measure_interval_map[origin_measure] = measure_global_interval(measure=origin_measure)
-
-        # add all following measures to the map
-        following: Measure | None = origin_measure.next_measure
-        while following is not None:
-            measure_interval_map[following] = measure_global_interval(measure=following)
-            following = following.next_measure
-
-        return measure_interval_map
+    return slices

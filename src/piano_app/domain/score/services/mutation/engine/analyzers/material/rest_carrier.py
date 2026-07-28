@@ -1,101 +1,112 @@
-from piano_app.domain.score.models.material.carrier_owner import CarrierOwner
+from piano_app.domain.score.models.material import NoteCarrier, Rest, RestCarrier
 from piano_app.domain.score.models.notation import RhythmicSize
-from piano_app.domain.score.models.structural import (
-    Measure,
-    MeasurePosition,
-    TemporalAnchor,
-    Voice,
-)
 from piano_app.domain.score.models.structural.rhythm.metric import LeafRhythmicContainer
-from piano_app.domain.score.services.mutation.instructions import ResultRef
+from piano_app.domain.score.services.helpers import find_leaf_at
+from piano_app.domain.score.services.mutation.engine.analyzers.base import MutationAnalyzer
+from piano_app.domain.score.services.mutation.engine.buffer import EmitBuffer
+from piano_app.domain.score.services.mutation.engine.resolver import ResolveBound
+from piano_app.domain.score.services.mutation.instructions import Bound, ResultRef
 from piano_app.domain.score.services.mutation.instructions.actions.material.rest_carrier import (
     CreateRestCarrierAction,
+    DeleteRestCarrierAction,
+)
+from piano_app.domain.score.services.mutation.instructions.requests.material import (
+    DeleteNoteCarrierRequest,
+    DeleteRestRequest,
 )
 from piano_app.domain.score.services.mutation.instructions.requests.material.rest_carrier import (
     CreateRestCarrierRequest,
+    DeleteRestCarrierRequest,
+)
+from piano_app.domain.score.services.mutation.instructions.requests.relations import (
+    DeleteRelationRequest,
 )
 from piano_app.domain.score.services.mutation.instructions.requests.rhythmic.leaf import (
-    CreateLeafRhythmicContainerRequest,
-)
-from piano_app.domain.score.services.mutation.engine.scope import (
-    EmitBuffer,
-    PlanningScope,
+    CreateLeafRequest,
 )
 
 
-class CreateRestCarrierAnalyzer:
-    """Creates a rest carrier on a leaf, finding or creating the leaf first.
+class CreateRestCarrierAnalyzer(MutationAnalyzer[CreateRestCarrierRequest]):
+    """Decides the metric owner of a new rest carrier.
 
-    TODO: emit the ``CreateRestAction`` for the rest inside the carrier — it
-    needs ``staff`` / ``staff_step``, which ``CreateRestCarrierRequest`` does
-    not yet carry (pending the fill staff-policy decision). A rest carrier is
-    meaningless without its rest, so this is incomplete until that is settled.
+    A same-size leaf is reused after deleting its current carrier; otherwise
+    creation of a new leaf is delegated.
     """
 
     def analyze(
         self,
         *,
         request: CreateRestCarrierRequest,
-        scope: PlanningScope,
+        resolver: ResolveBound,
     ) -> EmitBuffer:
-        to_emit: EmitBuffer = EmitBuffer()
+        buffer: EmitBuffer = EmitBuffer(request=request)
 
-        anchor: TemporalAnchor | None = self._find_anchor(
+        leaf: LeafRhythmicContainer | None = find_leaf_at(
             measure=request.measure,
             position=request.position,
-        )
-        leaf: LeafRhythmicContainer | None = (
-            self._find_leaf(anchor=anchor, voice=request.voice) if anchor is not None else None
+            voice=request.voice,
         )
 
-        owner: CarrierOwner | ResultRef[LeafRhythmicContainer]
-        if leaf is not None:
+        owner: Bound[LeafRhythmicContainer]
+        if (
+            leaf is not None
+            and leaf.written_size.value == request.written_value
+            and leaf.written_size.count == 1
+        ):
+            # if something is already attached to the leaf, delete it
+            if isinstance(leaf.carrier, NoteCarrier):
+                buffer.incorporate(item=DeleteNoteCarrierRequest(target=leaf.carrier))
+            elif isinstance(leaf.carrier, RestCarrier):  # this is unreachable at this point
+                buffer.incorporate(item=DeleteRestCarrierRequest(target=leaf.carrier))
+
             owner = leaf
         else:
-            owner = scope.incorporate_create(
-                into=to_emit, item=self._leaf_request(request=request, out=ResultRef())
+            owner = ResultRef[LeafRhythmicContainer]()
+            buffer.incorporate(
+                item=CreateLeafRequest(
+                    voice=request.voice,
+                    measure=request.measure,
+                    position=request.position,
+                    size=RhythmicSize(value=request.written_value, count=1),
+                    out=owner,
+                ),
             )
 
-        scope.incorporate_create(
-            into=to_emit, item=CreateRestCarrierAction(owner=owner, out=request.out)
-        )
-        return to_emit
-
-    def _leaf_request(
-        self,
-        *,
-        request: CreateRestCarrierRequest,
-        out: ResultRef[LeafRhythmicContainer],
-    ) -> CreateLeafRhythmicContainerRequest:
-        size: RhythmicSize = RhythmicSize(value=request.written_value, count=1)
-        return CreateLeafRhythmicContainerRequest(
-            voice=request.voice,
-            measure=request.measure,
-            position=request.position,
-            written_size=size,
-            occupied_size=size,
-            parent=None,
-            out=out,
+        buffer.incorporate(
+            item=CreateRestCarrierAction(
+                owner=owner,
+                out=request.out,
+            )
         )
 
-    def _find_anchor(
-        self,
-        *,
-        measure: Measure,
-        position: MeasurePosition,
-    ) -> TemporalAnchor | None:
-        return next(
-            (anchor for anchor in measure.anchors if anchor.position == position),
-            None,
-        )
+        return buffer
 
-    def _find_leaf(
+
+class DeleteRestCarrierAnalyzer(MutationAnalyzer[DeleteRestCarrierRequest]):
+    """Decides the rest carrier's deletion cascade.
+
+    A group relation is deleted only when it cannot remain valid without this
+    carrier; surviving groups lose the carrier during its detach. The optional
+    rest is deleted before the carrier. Owner cleanup is deferred to the boundary.
+    """
+
+    def analyze(
         self,
         *,
-        anchor: TemporalAnchor,
-        voice: Voice,
-    ) -> LeafRhythmicContainer | None:
-        return next(
-            (leaf for leaf in anchor.leaf_containers if leaf.voice is voice),
-            None,
-        )
+        request: DeleteRestCarrierRequest,
+        resolver: ResolveBound,
+    ) -> EmitBuffer:
+        buffer: EmitBuffer = EmitBuffer(request=request)
+        rest_carrier: RestCarrier = request.target
+
+        for relation in rest_carrier.carrier_group_relations:
+            if not relation.can_remove_carrier(carrier=rest_carrier):
+                buffer.incorporate(item=DeleteRelationRequest(target=relation))
+
+        rest: Rest | None = rest_carrier.rest
+        if rest is not None:
+            buffer.incorporate(item=DeleteRestRequest(target=rest))
+
+        buffer.incorporate(item=DeleteRestCarrierAction(target=rest_carrier))
+
+        return buffer

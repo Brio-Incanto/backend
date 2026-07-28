@@ -1,5 +1,8 @@
-from piano_app.domain.score.services.mutation.engine import EmitBuffer, PlanningScope
-from piano_app.domain.score.services.mutation.instructions.actions import (
+from piano_app.domain.score.models.relations import Relation
+from piano_app.domain.score.services.mutation.engine.analyzers.base import MutationAnalyzer
+from piano_app.domain.score.services.mutation.engine.buffer import EmitBuffer
+from piano_app.domain.score.services.mutation.engine.resolver import ResolveBound
+from piano_app.domain.score.services.mutation.instructions.actions.relations import (
     DeleteRelationAction,
 )
 from piano_app.domain.score.services.mutation.instructions.requests.relations.relation import (
@@ -7,15 +10,18 @@ from piano_app.domain.score.services.mutation.instructions.requests.relations.re
 )
 
 
-class DeleteRelationAnalyzer:
-    """A relation owns nothing, so its delete is a single action — no cascade."""
+class DeleteRelationAnalyzer(MutationAnalyzer[DeleteRelationRequest]):
+    """Decides direct deletion of a relation because it owns no child entities."""
 
     def analyze(
         self,
         *,
         request: DeleteRelationRequest,
-        scope: PlanningScope,
+        resolver: ResolveBound,
     ) -> EmitBuffer:
-        buffer: EmitBuffer = scope.create_buffer()
-        buffer.incorporate_delete(item=DeleteRelationAction(target=request.relation))
+        buffer: EmitBuffer = EmitBuffer(request=request)
+        relation: Relation = request.target
+
+        buffer.incorporate(item=DeleteRelationAction(target=relation))
+
         return buffer

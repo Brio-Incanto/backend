@@ -8,9 +8,9 @@ from piano_app.domain.score.models.structural import Measure, MeasurePosition, S
 from piano_app.domain.score.models.structural.rhythm import LeafRhythmicContainer
 from piano_app.domain.score.services.helpers import (
     Interval,
-    flatten,
     global_position,
     interval_in_parent_scope,
+    iter_leaves,
     translate_to_root,
 )
 
@@ -28,7 +28,7 @@ class _Observation:
     """A nearby element's placement, weighted by its proximity to the gap."""
 
     staff: Staff
-    step: Fraction  # the element's (chord's) centre step on the staff
+    step: Fraction  # the element's (chord's) center step on the staff
     weight: Fraction
 
 
@@ -79,7 +79,7 @@ class StaffResolver:
 
     def _observe(self, *, voice: Voice, target: Fraction) -> list[_Observation]:
         nearest: list[LeafRhythmicContainer] = sorted(
-            flatten(voice),
+            iter_leaves(voice),
             key=lambda container: self._distance_to_gap(leaf=container, target=target),
         )[: self._WINDOW]
 
@@ -91,7 +91,7 @@ class StaffResolver:
 
         return observations
 
-    # TODO intra-chord centre could use a non-uniform coefficient (outer/top notes)
+    # TODO intra-chord center could use a non-uniform coefficient (outer/top notes)
     def _observe_leaf(
         self, *, leaf: LeafRhythmicContainer, proximity: Fraction
     ) -> list[_Observation]:
@@ -102,17 +102,17 @@ class StaffResolver:
         note_count: int = sum(len(steps) for steps in steps_by_staff.values())
         observations: list[_Observation] = []
         for staff, steps in steps_by_staff.items():
-            centre: Fraction = Fraction(sum(steps), len(steps))
+            center: Fraction = Fraction(sum(steps), len(steps))
             share: Fraction = Fraction(len(steps), note_count)
-            observations.append(_Observation(staff=staff, step=centre, weight=proximity * share))
+            observations.append(_Observation(staff=staff, step=center, weight=proximity * share))
 
         return observations
 
     @staticmethod
     def _distance_to_gap(*, leaf: LeafRhythmicContainer, target: Fraction) -> Fraction:
         # measure against the leaf's whole global span, not just its start, so a long note
-        # ending right at the gap counts as adjacent (distance 0) instead of being penalised
-        span: Interval = translate_to_root(to_translate=interval_in_parent_scope(container=leaf))
+        # ending right at the gap counts as adjacent (distance 0) instead of being penalized
+        span: Interval = translate_to_root(interval=interval_in_parent_scope(container=leaf))
         if span.start <= target <= span.end:
             return Fraction(0)
         if target < span.start:

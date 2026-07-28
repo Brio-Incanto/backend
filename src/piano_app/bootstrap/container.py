@@ -1,8 +1,15 @@
+from collections import defaultdict
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from piano_app.adapters.outbound import InMemoryDocumentRepository
-from .seed import build_seed_document
+from piano_app.adapters.inbound.http import (
+    build_edit_router,
+    register_exception_handlers,
+)
+from piano_app.adapters.outbound import InMemoryDraftStore
+from piano_app.domain.score.services.mutation.compiler import MutationCompiler
+from piano_app.domain.score.services.mutation.engine import MutationEngine
 from piano_app.domain.score.services.mutation.engine.analyzers.material import (
     CreateNoteAnalyzer,
     CreateNoteCarrierAnalyzer,
@@ -50,9 +57,9 @@ from piano_app.domain.score.services.mutation.engine.handlers.temporal import (
     DeleteTemporalAnchorHandler,
 )
 from piano_app.domain.score.services.mutation.engine.postprocessors import (
-    MutatedStatePostprocessor,
-    FillGapsPostprocessor,
     CleanupPostprocessor,
+    FillGapsPostprocessor,
+    MutatedStatePostprocessor,
 )
 from piano_app.domain.score.services.mutation.engine.registry import (
     MutationAnalyzerRegistry,
@@ -106,8 +113,9 @@ from piano_app.domain.score.services.mutation.instructions.requests.temporal imp
     CreateTemporalAnchorRequest,
     DeleteTemporalAnchorRequest,
 )
-from ..adapters.inbound.http import build_router
-from ..application.use_cases.score import UndoStack, ScoreMutationService
+
+from ..application.use_cases.score import ScoreEditService, UndoRedoStack
+from .seed import build_seed_document
 
 
 def build_analyzer_registry() -> MutationAnalyzerRegistry:
@@ -193,18 +201,35 @@ def build_postprocessors() -> list[MutatedStatePostprocessor]:
     return registry
 
 
-def build_app() -> FastAPI:
-    # TODO temporary
-    repository: InMemoryDocumentRepository = InMemoryDocumentRepository(
-        document=build_seed_document()
-    )
-    service: ScoreMutationService = ScoreMutationService(
-        analyzers=build_analyzer_registry(),
-        handlers=build_handler_registry(),
-        repository=repository,
-        undo_stack=UndoStack(),
+_DEFAULT_SCORE_ID: str = "default"
+
+
+def build_engine() -> MutationEngine:
+    return MutationEngine(
+        handler_registry=build_handler_registry(),
+        analyzer_registry=build_analyzer_registry(),
+        postprocessors=build_postprocessors(),
     )
 
+
+def build_score_edit_service() -> ScoreEditService:
+    """Build the transient-edit use case and its current in-memory adapters."""
+    engine: MutationEngine = build_engine()
+    compiler: MutationCompiler = MutationCompiler()
+    store: InMemoryDraftStore = InMemoryDraftStore(
+        drafts={_DEFAULT_SCORE_ID: build_seed_document(engine=engine, compiler=compiler)}
+    )
+    undo: defaultdict[str, UndoRedoStack] = defaultdict(UndoRedoStack)
+    return ScoreEditService(
+        engine=engine,
+        compiler=compiler,
+        store=store,
+        undo=undo,
+    )
+
+
+def build_app() -> FastAPI:
+    service: ScoreEditService = build_score_edit_service()
     app: FastAPI = FastAPI(title="Piano App")
     app.add_middleware(
         CORSMiddleware,
@@ -212,5 +237,6 @@ def build_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.include_router(build_router(service=service, repository=repository))
+    register_exception_handlers(app=app)
+    app.include_router(build_edit_router(service=service))
     return app

@@ -31,6 +31,7 @@ class TieNotesCommand:
     start_note_id: str
     end_note_id: str
 
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DeleteBatchCommand:
     entity_ids: Sequence[str]

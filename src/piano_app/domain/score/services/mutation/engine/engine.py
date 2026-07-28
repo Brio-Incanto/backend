@@ -1,17 +1,23 @@
-from piano_app.domain.score.models import ScoreEntity
+from collections.abc import Sequence
+
+from piano_app.domain.score.models import ScoreDocument, ScoreEntity
 from piano_app.domain.score.models.mutation_sink import MutationSink
 from piano_app.domain.score.services.mutation.instructions import (
     MutationAction,
     MutationRequest,
 )
+from piano_app.domain.score.services.mutation.instructions.actions.base import (
+    CreateMutationAction,
+    DeleteMutationAction,
+)
 
+from .buffer import EmitBuffer
 from .handlers import MutationHandler
 from .log import MutationLog
-from .postprocessors import PlanPostprocessor
+from .postprocessors import MutatedStatePostprocessor
 from .registry import MutationAnalyzerRegistry, MutationHandlerRegistry
 from .resolver import Resolver
-from .scope import EmitBuffer, PlanningScope
-from .typing import PlanItem
+from .typing import MutationWorkItem
 
 
 class MutationEngine:
@@ -21,7 +27,7 @@ class MutationEngine:
     replaced by the items it emits; a popped action is executed **immediately**
     against the live model. Pushing emitted items reversed makes the LIFO stack
     preserve authoring order, so the analyzers' order *is* the execution order —
-    the planner never reorders. Refs resolve from the run-time env at execution
+    the engine never reorders. Refs resolve from the run-time env at execution
     (the producer is popped before its consumer).
 
     One ``process`` call is one gesture and one transaction: a handler error
@@ -34,47 +40,84 @@ class MutationEngine:
         *,
         handler_registry: MutationHandlerRegistry,
         analyzer_registry: MutationAnalyzerRegistry,
-        postprocessors: list[PlanPostprocessor],
+        postprocessors: list[MutatedStatePostprocessor],
     ) -> None:
         self._handler_registry: MutationHandlerRegistry = handler_registry
         self._analyzer_registry: MutationAnalyzerRegistry = analyzer_registry
-        self._postprocessors: list[PlanPostprocessor] = postprocessors
+        self._postprocessors: list[MutatedStatePostprocessor] = postprocessors
 
-    def process(self, *, request: MutationRequest) -> MutationLog:
-        # scope, env and log are per-gesture: a fresh emit channel, run-time
-        # environment and journal for this transaction.
-        scope: PlanningScope = PlanningScope()
+    # TODO consider adding convergence checking
+    def process(
+        self, *, document: ScoreDocument, requests: Sequence[MutationRequest]
+    ) -> MutationLog:
+        # env and log are per-gesture: a fresh run-time environment and journal
+        # for this transaction.
         resolver: Resolver = Resolver()
         log: MutationLog = MutationLog()
 
-        stack: list[PlanItem] = [request]
-
+        # TODO run tests to check how works with transitional state
         try:
-            while stack:
-                item: PlanItem = stack.pop()
+            self._drain(requests=requests, resolver=resolver, log=log)
 
-                if isinstance(item, MutationAction):
-                    self._execute(action=item, resolver=resolver, sink=log)
-                    continue
+            fixes_produced: bool = True
+            while fixes_produced:
+                fixes_produced = False
 
-                buffer: EmitBuffer = self._analyzer_registry.get(request_type=type(item)).analyze(
-                    request=item, scope=scope
-                )
-                stack.extend(reversed(buffer.get_view()))
+                for postprocessor in self._postprocessors:
+                    fix_requests: Sequence[MutationRequest] = postprocessor.search_fixes(
+                        document=document,
+                    )
 
-            # TODO run postprocessors to a fixpoint here
-            # and idempotent — loop with an iter cap, reject on non-convergence.
+                    # set the flag and prevent passing empty list to _drain
+                    if fix_requests:
+                        fixes_produced = True
+                        self._drain(requests=fix_requests, resolver=resolver, log=log)
+
         except Exception:
             log.rollback()
             raise
 
         return log
 
+    def _drain(
+        self, *, requests: Sequence[MutationRequest], resolver: Resolver, log: MutationLog
+    ) -> None:
+        """Unfolds a request into a tree and executes as it unfolds.
+        Actions are leaves of the tree, requests are internal nodes.
+        """
+        stack: list[MutationWorkItem] = list(reversed(requests))
+
+        while stack:
+            item: MutationWorkItem = stack.pop()
+
+            if isinstance(item, MutationAction):
+                self._execute(action=item, resolver=resolver, sink=log)
+                continue
+
+            buffer: EmitBuffer = self._analyzer_registry.get(request_type=type(item)).analyze(
+                request=item,
+                resolver=resolver,
+            )
+            stack.extend(reversed(buffer.items))
+
     def _execute(self, *, action: MutationAction, resolver: Resolver, sink: MutationSink) -> None:
-        """Effect one action: dispatch to its handler, bind the produced entity
-        into the run-time env under the action's ref."""
-        handler: MutationHandler = self._handler_registry.get(action_type=type(action))
+        """Executes a single action, checks its type, validates the expected output,
+        and registers in resolver if something is produced.
+        """
+        handler: MutationHandler[MutationAction] = self._handler_registry.get(
+            action_type=type(action)
+        )
         produced: ScoreEntity | None = handler.handle(action=action, resolve=resolver, sink=sink)
 
-        if produced is not None:
-            resolver.register(ref=action.produced_ref, entity=produced)
+        if isinstance(action, CreateMutationAction):
+            if produced is None:
+                raise ValueError(f"Create handler produced nothing: {type(action).__name__}.")
+
+            resolver.register(reference=action.produced_ref, entity=produced)
+
+        elif isinstance(action, DeleteMutationAction):
+            if produced is not None:
+                raise ValueError(f"Delete handler produced an entity: {type(action).__name__}.")
+
+        else:
+            raise ValueError(f"Action is neither create nor delete: {type(action).__name__}.")

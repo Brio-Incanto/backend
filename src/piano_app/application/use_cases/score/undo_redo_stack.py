@@ -22,7 +22,9 @@ class UndoRedoStack:
         self._redo.clear()
 
     def undo(self) -> bool:
-        """Rollback the most recent gesture. Returns ``False`` if the undo stack is empty."""
+        """Rollback the most recent gesture.
+        Returns ``False`` if the undo stack is empty.
+        """
         if not self._undo:
             return False
 
@@ -32,7 +34,9 @@ class UndoRedoStack:
         return True
 
     def redo(self) -> bool:
-        """Reapply the most recently undone gesture. Returns ``False`` if the redo stack is empty."""
+        """Reapply the most recently undone gesture.
+        Returns ``False`` if the redo stack is empty.
+        """
         if not self._redo:
             return False
 

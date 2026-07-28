@@ -2,73 +2,101 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 
-class JournalEntry(Protocol):
-    def undo(self) -> None: ...
+class _JournalEntry(Protocol):
+    def apply(self) -> None: ...  # redo: re-do the forward change
+
+    def undo(self) -> None: ...  # undo: revert to the previous state
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _SetField:
-    obj: object
-    name: str
-    old: object
+    target: object
+    field_name: str
+    previous_value: object
+    new_value: object
+
+    def apply(self) -> None:
+        setattr(self.target, self.field_name, self.new_value)
 
     def undo(self) -> None:
-        setattr(self.obj, self.name, self.old)
+        setattr(self.target, self.field_name, self.previous_value)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _ListInsert:
     target: list[Any]
     index: int
+    item: Any
+
+    def apply(self) -> None:
+        self.target.insert(self.index, self.item)
 
     def undo(self) -> None:
         del self.target[self.index]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _ListRemove:
     target: list[Any]
     index: int
     item: Any
+
+    def apply(self) -> None:
+        del self.target[self.index]
 
     def undo(self) -> None:
         self.target.insert(self.index, self.item)
 
 
 class MutationLog:
-    """Append-only journal of state-changing primitives.
+    """Append-only journal of state-changing primitives — reversible AND re-appliable.
 
-    Handlers route every mutation through these primitives, so each change is
-    reversible by construction (each entry captures the inverse, not just the
-    fact that something happened). ``rollback`` replays the journal backwards;
-    on success the caller keeps the log and pushes it onto the undo stack.
-
-    The three primitives compose the higher-level domain operations:
-    attach/detach are just list inserts/removes, edits are field sets.
+    Each entry captures both directions: ``undo`` reverts to the previous state and
+    ``apply`` re-does the forward change. So one journal serves three roles: the
+    gesture's inverse (transaction abort / user undo) and its replay (redo), and, in
+    time, the delta between two saved revisions. Handlers route every mutation through
+    these primitives, so attach/detach are list inserts/removes and edits are field sets.
     """
 
     def __init__(self) -> None:
-        self._entries: list[JournalEntry] = []
+        self._entries: list[_JournalEntry] = []
 
-    def set_field(self, obj: object, name: str, value: object) -> None:
-        self._entries.append(_SetField(obj=obj, name=name, old=getattr(obj, name)))
-        setattr(obj, name, value)
+    def set_field(self, target: object, field_name: str, value: object) -> None:
+        entry: _SetField = _SetField(
+            target=target,
+            field_name=field_name,
+            previous_value=getattr(target, field_name),
+            new_value=value,
+        )
+        entry.apply()
+        self._entries.append(entry)
 
     def list_append(self, target: list[Any], item: Any) -> None:
-        self._entries.append(_ListInsert(target=target, index=len(target)))
-        target.append(item)
+        entry: _ListInsert = _ListInsert(target=target, index=len(target), item=item)
+        entry.apply()
+        self._entries.append(entry)
 
     def list_insert(self, target: list[Any], index: int, item: Any) -> None:
-        self._entries.append(_ListInsert(target=target, index=index))
-        target.insert(index, item)
+        entry: _ListInsert = _ListInsert(target=target, index=index, item=item)
+        entry.apply()
+        self._entries.append(entry)
 
     def list_remove(self, target: list[Any], item: Any) -> None:
         index: int = target.index(item)
-        self._entries.append(_ListRemove(target=target, index=index, item=item))
-        del target[index]
+        entry: _ListRemove = _ListRemove(target=target, index=index, item=item)
+        entry.apply()
+        self._entries.append(entry)
 
     def rollback(self) -> None:
+        """Revert the journal (one gesture). Replay every entry's ``undo`` in reverse order.
+
+        Used for a transaction abort (the failed gesture is then dropped) and for user
+        undo (the journal is kept and moves to the redo stack).
+        """
         for entry in reversed(self._entries):
             entry.undo()
 
-        self._entries.clear()
+    def reapply(self) -> None:
+        """Re-do the journal (one gesture). Replay every entry's ``apply`` in original order."""
+        for entry in self._entries:
+            entry.apply()

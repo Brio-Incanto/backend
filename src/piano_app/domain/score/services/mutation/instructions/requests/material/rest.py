@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from piano_app.domain.score.models.material.primitive import Rest
 from piano_app.domain.score.models.notation import DottedRhythmicValue
@@ -8,14 +8,16 @@ from piano_app.domain.score.models.structural import (
     Staff,
     Voice,
 )
-from piano_app.domain.score.services.mutation.instructions import ResultRef
 from piano_app.domain.score.services.mutation.instructions.requests.base import (
-    MutationRequest,
+    CreateMutationRequest,
+    DeleteMutationRequest,
 )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class CreateRestRequest(MutationRequest):
+class CreateRestRequest(CreateMutationRequest[Rest]):
+    """A request to create a rest in a voice, on a staff, at a measure position."""
+
     voice: Voice
     staff: Staff
     measure: Measure
@@ -24,8 +26,7 @@ class CreateRestRequest(MutationRequest):
     written_value: DottedRhythmicValue
     staff_step: int
 
-    out: ResultRef[Rest] = field(default_factory=ResultRef)
 
-    @property
-    def produced_ref(self) -> ResultRef[Rest]:
-        return self.out
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteRestRequest(DeleteMutationRequest[Rest]):
+    """A request to delete a rest."""

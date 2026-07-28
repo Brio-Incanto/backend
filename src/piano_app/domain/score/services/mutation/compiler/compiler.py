@@ -8,6 +8,7 @@ from piano_app.domain.score.models.notation import (
     Fingering,
     RhythmicValue,
 )
+from piano_app.domain.score.models.relations.start_end import Tie
 from piano_app.domain.score.models.structural import (
     Measure,
     MeasurePosition,
@@ -26,21 +27,21 @@ from piano_app.domain.score.services.mutation.instructions.requests.material imp
     DeleteRestCarrierRequest,
     DeleteRestRequest,
 )
+from piano_app.domain.score.services.mutation.instructions.requests.relations import (
+    CreateTieRequest,
+)
 from piano_app.domain.score.services.resolution import ScoreEntityResolver
 
-from .intents import DeleteBatchIntent, InsertNoteIntent
+from .intents import DeleteBatchIntent, InsertNoteIntent, TieNotesIntent
 
 
 # TODO split into smaller pieces
 class MutationCompiler:
-    """Entry / command-compiler (tier 1): turns a coarse edit intent into the fine
+    """Entry / command-compiler: turns a coarse edit intent into the fine
     engine requests the drain unfolds.
 
     Deterministic — it reads the document grid, mints the SSA ``out`` ref, and never
-    mutates. This is the seam where pre-computable decomposition lives: cross-barline
-    slicing (an insert split into within-measure tied pieces) will land here so the
-    engine never sees a multi-measure interval. v1 is within-measure only, so the
-    bodies are near pass-through.
+    mutates. This is the seam where pre-computable decomposition lives.
     """
 
     # TODO add support of cross measure slicing
@@ -155,6 +156,29 @@ class MutationCompiler:
             *(DeleteNoteRequest(target=note) for note in notes),
             *(DeleteRestRequest(target=rest) for rest in rests),
         ]
+
+    def compile_tie_notes(
+        self,
+        *,
+        document: ScoreDocument,
+        intent: TieNotesIntent,
+    ) -> Sequence[MutationRequest]:
+        entities_by_id: dict[str, ScoreEntity] = self._resolve(
+            document=document,
+            entity_ids=(intent.start_note_id, intent.end_note_id),
+        )
+        start_note: Note = self._expect(
+            entities_by_id=entities_by_id,
+            entity_id=intent.start_note_id,
+            expected=Note,
+        )
+        end_note: Note = self._expect(
+            entities_by_id=entities_by_id,
+            entity_id=intent.end_note_id,
+            expected=Note,
+        )
+
+        return [CreateTieRequest(start_note=start_note, end_note=end_note, out=ResultRef[Tie]())]
 
     @staticmethod
     def _resolve(

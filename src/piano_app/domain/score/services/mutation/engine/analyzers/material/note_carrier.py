@@ -1,142 +1,116 @@
-from piano_app.domain.score.models.material.carrier import (
-    Carrier,
-    NoteCarrier,
-    RestCarrier,
-)
-from piano_app.domain.score.models.notation import DottedRhythmicValue, RhythmicSize
-from piano_app.domain.score.models.structural import (
-    Measure,
-    MeasurePosition,
-    TemporalAnchor,
-    Voice,
-)
-from piano_app.domain.score.models.structural.rhythm.metric import LeafRhythmicContainer
-from piano_app.domain.score.services.mutation.instructions import ResultRef
-from piano_app.domain.score.services.mutation.instructions.actions.material.note_carrier import (
+from piano_app.domain.score.models.material.carrier import NoteCarrier, RestCarrier
+from piano_app.domain.score.models.notation import RhythmicSize
+from piano_app.domain.score.models.structural.rhythm import LeafRhythmicContainer
+from piano_app.domain.score.services.helpers import find_leaf_at
+from piano_app.domain.score.services.mutation.engine.analyzers.base import MutationAnalyzer
+from piano_app.domain.score.services.mutation.engine.buffer import EmitBuffer
+from piano_app.domain.score.services.mutation.engine.resolver import ResolveBound
+from piano_app.domain.score.services.mutation.instructions import Bound, ResultRef
+from piano_app.domain.score.services.mutation.instructions.actions.material import (
     CreateNoteCarrierAction,
+    DeleteNoteCarrierAction,
 )
-from piano_app.domain.score.services.mutation.instructions.requests.material.note_carrier import (
+from piano_app.domain.score.services.mutation.instructions.requests.material import (
     CreateNoteCarrierRequest,
+    DeleteNoteCarrierRequest,
+    DeleteNoteRequest,
+    DeleteRestCarrierRequest,
+)
+from piano_app.domain.score.services.mutation.instructions.requests.relations import (
+    DeleteRelationRequest,
 )
 from piano_app.domain.score.services.mutation.instructions.requests.rhythmic.leaf import (
-    CreateLeafRhythmicContainerRequest,
-)
-from piano_app.domain.score.services.mutation.engine.scope import (
-    EmitBuffer,
-    PlanningScope,
+    CreateLeafRequest,
 )
 
 
-# TODO add grace support, somehow resolve belonging to grace group
-class CreateNoteCarrierAnalyzer:
-    """Carrier level: replace an existing same-size leaf's carrier, or create a
-    new leaf to host the carrier."""
+class CreateNoteCarrierAnalyzer(MutationAnalyzer[CreateNoteCarrierRequest]):
+    """Decides the metric owner of a new note carrier.
 
-    # TODO is broken, check anchor None before leaf
+    A same-size leaf is reused after deleting its current carrier; otherwise
+    creation of a new leaf is delegated.
+    """
+
     def analyze(
         self,
         *,
         request: CreateNoteCarrierRequest,
-        scope: PlanningScope,
+        resolver: ResolveBound,
     ) -> EmitBuffer:
-        to_emit: EmitBuffer = EmitBuffer()
+        buffer: EmitBuffer = EmitBuffer(request=request)
 
-        anchor: TemporalAnchor | None = self._find_anchor(
+        leaf: LeafRhythmicContainer | None = find_leaf_at(
             measure=request.measure,
             position=request.position,
-        )
-        leaf: LeafRhythmicContainer | None = (
-            self._find_leaf(anchor=anchor, voice=request.voice) if anchor is not None else None
+            voice=request.voice,
         )
 
-        if leaf is not None and self._has_same_written_size(
-            leaf=leaf,
-            written_value=request.written_value,
+        # if a same-size leaf already exists replace its carrier on it;
+        # otherwise a new leaf is created to host the carrier
+        owner: Bound[LeafRhythmicContainer]
+        if (
+            leaf is not None
+            and leaf.written_size.value == request.written_value
+            and leaf.written_size.count == 1
         ):
-            self._replace_on_leaf(into=to_emit, scope=scope, leaf=leaf, request=request)
+            # if something is already attached to the leaf, delete it
+            if isinstance(leaf.carrier, NoteCarrier):  # this is unreachable at this point
+                buffer.incorporate(item=DeleteNoteCarrierRequest(target=leaf.carrier))
+            elif isinstance(leaf.carrier, RestCarrier):
+                buffer.incorporate(item=DeleteRestCarrierRequest(target=leaf.carrier))
+
+            owner = leaf
         else:
-            self._create_on_new_leaf(into=to_emit, scope=scope, request=request)
+            owner = ResultRef[LeafRhythmicContainer]()
+            buffer.incorporate(
+                item=CreateLeafRequest(
+                    voice=request.voice,
+                    measure=request.measure,
+                    position=request.position,
+                    size=RhythmicSize(value=request.written_value, count=1),
+                    out=owner,
+                ),
+            )
 
-        return to_emit
-
-    def _replace_on_leaf(
-        self,
-        *,
-        into: EmitBuffer,
-        scope: PlanningScope,
-        leaf: LeafRhythmicContainer,
-        request: CreateNoteCarrierRequest,
-    ) -> None:
-        carrier: Carrier | None = leaf.carrier
-        if isinstance(carrier, NoteCarrier):
-            scope.incorporate_delete(into=into, item=DeleteNoteCarrierRequest(note_carrier=carrier))
-        elif isinstance(carrier, RestCarrier):
-            scope.incorporate_delete(into=into, item=DeleteRestCarrierRequest(rest_carrier=carrier))
-
-        scope.incorporate_create(
-            into=into,
+        buffer.incorporate(
             item=CreateNoteCarrierAction(
-                owner=leaf,
+                owner=owner,
                 articulation=request.articulation,
                 out=request.out,
             ),
         )
 
-    def _create_on_new_leaf(
-        self,
-        *,
-        into: EmitBuffer,
-        scope: PlanningScope,
-        request: CreateNoteCarrierRequest,
-    ) -> None:
-        size: RhythmicSize = RhythmicSize(value=request.written_value, count=1)
-        leaf_ref: ResultRef[LeafRhythmicContainer] = scope.incorporate_create(
-            into=into,
-            item=CreateLeafRhythmicContainerRequest(
-                voice=request.voice,
-                measure=request.measure,
-                position=request.position,
-                written_size=size,
-                occupied_size=size,
-                parent=None,
-                out=ResultRef(),
-            ),
-        )
-        scope.incorporate_create(
-            into=into,
-            item=CreateNoteCarrierAction(
-                owner=leaf_ref,
-                articulation=request.articulation,
-                out=request.out,
-            ),
-        )
+        return buffer
 
-    def _find_anchor(
-        self,
-        *,
-        measure: Measure,
-        position: MeasurePosition,
-    ) -> TemporalAnchor | None:
-        return next(
-            (anchor for anchor in measure.anchors if anchor.position == position),
-            None,
-        )
 
-    def _find_leaf(
-        self,
-        *,
-        anchor: TemporalAnchor,
-        voice: Voice,
-    ) -> LeafRhythmicContainer | None:
-        return next(
-            (leaf for leaf in anchor.leaf_containers if leaf.voice is voice),
-            None,
-        )
+class DeleteNoteCarrierAnalyzer(MutationAnalyzer[DeleteNoteCarrierRequest]):
+    """Decides the note carrier's deletion cascade.
 
-    def _has_same_written_size(
+    A group relation is deleted only when it cannot remain valid without this
+    carrier; surviving groups lose the carrier during its detach. All notes are
+    deleted before the carrier. Cleanup of its owner is deferred to the boundary.
+    """
+
+    def analyze(
         self,
         *,
-        leaf: LeafRhythmicContainer,
-        written_value: DottedRhythmicValue,
-    ) -> bool:
-        return leaf.written_size.fraction == written_value.fraction
+        request: DeleteNoteCarrierRequest,
+        resolver: ResolveBound,
+    ) -> EmitBuffer:
+        buffer: EmitBuffer = EmitBuffer(request=request)
+        note_carrier: NoteCarrier = request.target
+
+        for note_carrier_relation in note_carrier.note_carrier_group_relations:
+            if not note_carrier_relation.can_remove_note_carrier(note_carrier=note_carrier):
+                buffer.incorporate(item=DeleteRelationRequest(target=note_carrier_relation))
+
+        for carrier_relation in note_carrier.carrier_group_relations:
+            if not carrier_relation.can_remove_carrier(carrier=note_carrier):
+                buffer.incorporate(item=DeleteRelationRequest(target=carrier_relation))
+
+        for note in note_carrier.notes:
+            buffer.incorporate(item=DeleteNoteRequest(target=note))
+
+        buffer.incorporate(item=DeleteNoteCarrierAction(target=request.target))
+
+        return buffer

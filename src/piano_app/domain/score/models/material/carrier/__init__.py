@@ -1,9 +1,9 @@
 from .base import Carrier
+from .note_carrier import NoteCarrier
 from .rest_carrier import RestCarrier
-from .sound_carrier import SoundCarrier
 
 __all__ = (
     "Carrier",
+    "NoteCarrier",
     "RestCarrier",
-    "SoundCarrier",
 )

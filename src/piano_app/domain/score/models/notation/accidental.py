@@ -6,5 +6,3 @@ class Accidental(StrEnum):
     FLAT = "flat"
     NATURAL = "natural"
     SHARP = "sharp"
-    DOUBLE_FLAT = "double_flat"
-    DOUBLE_SHARP = "double_sharp"

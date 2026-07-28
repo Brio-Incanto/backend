@@ -55,17 +55,15 @@ class Interval:
         self._validate_scope(other=other)
         return self.start < other.end and other.start < self.end
 
-    # TODO raise if fully contained?
-    def overlaps_left(self, other: Interval) -> bool:
-        """True if the left endpoint of ``other`` lies within this interval."""
+    def starts_inside(self, other: Interval) -> bool:
+        """True if the interval starts inside the other interval."""
         self._validate_scope(other=other)
-        return self.start < other.start < self.end
+        return other.start <= self.start < other.end
 
-    # TODO raise if fully contained?
-    def overlaps_right(self, other: Interval) -> bool:
-        """True if this interval's left endpoint lies within ``other``."""
+    def ends_inside(self, other: Interval) -> bool:
+        """True if the interval ends inside the other interval."""
         self._validate_scope(other=other)
-        return other.start < self.start < other.end
+        return other.start < self.end <= other.end
 
     def contains(self, other: Interval) -> bool:
         """True if ``other`` lies fully within this interval (bounds inclusive)."""

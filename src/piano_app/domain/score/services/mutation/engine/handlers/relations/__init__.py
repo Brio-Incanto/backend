@@ -1,3 +1,7 @@
 from .relation import DeleteRelationHandler
+from .tie import CreateTieHandler
 
-__all__ = ("DeleteRelationHandler",)
+__all__ = (
+    "CreateTieHandler",
+    "DeleteRelationHandler",
+)
