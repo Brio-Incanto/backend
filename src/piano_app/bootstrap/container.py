@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,7 +5,8 @@ from piano_app.adapters.inbound.http import (
     build_edit_router,
     register_exception_handlers,
 )
-from piano_app.adapters.outbound import InMemoryDraftStore
+from piano_app.adapters.outbound.in_memory_draft_history import InMemoryDraftHistory
+from piano_app.application.use_cases.score import ScoreEditService
 from piano_app.domain.score.services.mutation.compiler import MutationCompiler
 from piano_app.domain.score.services.mutation.engine import MutationEngine
 from piano_app.domain.score.services.mutation.engine.analyzers.material import (
@@ -114,7 +113,6 @@ from piano_app.domain.score.services.mutation.instructions.requests.temporal imp
     DeleteTemporalAnchorRequest,
 )
 
-from ..application.use_cases.score import ScoreEditService, UndoRedoStack
 from .seed import build_seed_document
 
 
@@ -216,15 +214,13 @@ def build_score_edit_service() -> ScoreEditService:
     """Build the transient-edit use case and its current in-memory adapters."""
     engine: MutationEngine = build_engine()
     compiler: MutationCompiler = MutationCompiler()
-    store: InMemoryDraftStore = InMemoryDraftStore(
+    store: InMemoryDraftHistory = InMemoryDraftHistory(
         drafts={_DEFAULT_SCORE_ID: build_seed_document(engine=engine, compiler=compiler)}
     )
-    undo: defaultdict[str, UndoRedoStack] = defaultdict(UndoRedoStack)
     return ScoreEditService(
         engine=engine,
         compiler=compiler,
-        store=store,
-        undo=undo,
+        history=store,
     )
 
 

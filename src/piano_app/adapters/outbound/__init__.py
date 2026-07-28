@@ -1,3 +1,3 @@
-from .in_memory_draft_store import InMemoryDraftStore
+from .in_memory_draft_history import InMemoryDraftHistory
 
-__all__ = ("InMemoryDraftStore",)
+__all__ = ("InMemoryDraftHistory",)
