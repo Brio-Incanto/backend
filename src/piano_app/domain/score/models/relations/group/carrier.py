@@ -73,6 +73,18 @@ class Beam(CarrierGroupRelation):
         beam.attach(sink=sink)
         return beam
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        carriers: list[Carrier],
+        sink: MutationSink = DIRECT_SINK,
+    ) -> Beam:
+        beam: Beam = cls(id=id, _members=list(carriers))
+        beam.attach(sink=sink)
+        return beam
+
     def attach(self, *, sink: MutationSink = DIRECT_SINK) -> None:
         for carrier in self._members:
             self._validate_available_carrier(carrier=carrier)

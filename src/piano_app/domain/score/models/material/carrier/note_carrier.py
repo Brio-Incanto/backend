@@ -45,6 +45,24 @@ class NoteCarrier(Carrier):
         carrier.attach(sink=sink)
         return carrier
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        owner: CarrierOwner,
+        articulation: Articulation = Articulation.NONE,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> NoteCarrier:
+        carrier: NoteCarrier = cls(
+            id=id,
+            _owner=owner,
+            articulation=articulation,
+        )
+
+        carrier.attach(sink=sink)
+        return carrier
+
     def detach(self, *, sink: MutationSink = DIRECT_SINK) -> None:
         if any(
             not relation.can_remove_note_carrier(note_carrier=self)

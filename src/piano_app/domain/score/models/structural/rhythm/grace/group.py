@@ -50,6 +50,26 @@ class GraceGroup(ScoreEntity):
         group.attach(sink=sink)
         return group
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        leaf: LeafRhythmicContainer,
+        grace_type: GraceType,
+        placement: GracePlacement,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> GraceGroup:
+        group: GraceGroup = cls(
+            id=id,
+            grace_type=grace_type,
+            placement=placement,
+            _leaf=leaf,
+        )
+
+        group.attach(sink=sink)
+        return group
+
     def attach(
         self,
         *,

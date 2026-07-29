@@ -36,6 +36,26 @@ class Rest(MusicalItem):
         rest.attach(sink=sink)
         return rest
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        rest_carrier: RestCarrier,
+        staff: Staff,
+        staff_step: int,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> Rest:
+        rest: Rest = cls(
+            id=id,
+            staff_step=staff_step,
+            _staff=staff,
+            _rest_carrier=rest_carrier,
+        )
+
+        rest.attach(sink=sink)
+        return rest
+
     def attach(self, *, sink: MutationSink = DIRECT_SINK) -> None:
         super().attach(sink=sink)
         self._rest_carrier.attach_rest(rest=self, sink=sink)

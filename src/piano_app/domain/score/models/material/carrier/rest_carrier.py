@@ -32,6 +32,22 @@ class RestCarrier(Carrier):
         carrier.attach(sink=sink)
         return carrier
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        owner: CarrierOwner,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> RestCarrier:
+        carrier: RestCarrier = cls(
+            id=id,
+            _owner=owner,
+        )
+
+        carrier.attach(sink=sink)
+        return carrier
+
     def attach_rest(
         self,
         *,

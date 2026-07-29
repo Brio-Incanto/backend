@@ -11,9 +11,17 @@ class ScoreDocument:
     # voices / staffs are owned collections with no wiring method (fixed at
     # construction) → plain fields. measures is the linked chain the document
     # mutates through append/insert/remove → private + read-only view.
-    voices: list[Voice]
-    staffs: list[Staff]
+    _voices: list[Voice]
+    _staffs: list[Staff]
     _measures: list[Measure]
+
+    @property
+    def voices(self) -> Sequence[Voice]:
+        return self._voices
+
+    @property
+    def staffs(self) -> Sequence[Staff]:
+        return self._staffs
 
     @property
     def measures(self) -> Sequence[Measure]:
@@ -27,7 +35,7 @@ class ScoreDocument:
         staffs: list[Staff],
         measures: list[Measure],
     ) -> ScoreDocument:
-        return cls(voices=voices, staffs=staffs, _measures=measures)
+        return cls(_voices=voices, _staffs=staffs, _measures=measures)
 
     def insert_measure_after(
         self,

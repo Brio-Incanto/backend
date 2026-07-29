@@ -53,6 +53,30 @@ class Note(MusicalItem):
         note.attach(sink=sink)
         return note
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        note_carrier: NoteCarrier,
+        staff: Staff,
+        staff_step: int,
+        accidental: Accidental,
+        fingering: Fingering = Fingering.NONE,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> Note:
+        note: Note = cls(
+            id=id,
+            staff_step=staff_step,
+            _staff=staff,
+            _note_carrier=note_carrier,
+            accidental=accidental,
+            fingering=fingering,
+        )
+
+        note.attach(sink=sink)
+        return note
+
     def attach(self, *, sink: MutationSink = DIRECT_SINK) -> None:
         super().attach(sink=sink)
         self._note_carrier.add_note(note=self, sink=sink)
