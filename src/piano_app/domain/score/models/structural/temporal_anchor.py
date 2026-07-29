@@ -87,6 +87,24 @@ class TemporalAnchor(ScoreEntity):
         anchor.attach(sink=sink)
         return anchor
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        measure: Measure,
+        position: MeasurePosition,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> TemporalAnchor:
+        anchor: TemporalAnchor = cls(
+            id=id,
+            position=position,
+            _measure=measure,
+        )
+
+        anchor.attach(sink=sink)
+        return anchor
+
     def attach(
         self,
         *,

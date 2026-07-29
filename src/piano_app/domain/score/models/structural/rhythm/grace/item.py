@@ -42,6 +42,24 @@ class GraceItem(ScoreEntity):
         grace_item.attach(sink=sink)
         return grace_item
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        grace_group: GraceGroup,
+        rhythmic_value: DottedRhythmicValue,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> GraceItem:
+        grace_item: GraceItem = cls(
+            id=id,
+            rhythmic_value=rhythmic_value,
+            _grace_group=grace_group,
+        )
+
+        grace_item.attach(sink=sink)
+        return grace_item
+
     def attach(self, *, sink: MutationSink = DIRECT_SINK) -> None:
         self._grace_group.add_grace_item(grace_item=self, sink=sink)
 

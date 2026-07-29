@@ -60,6 +60,27 @@ class LeafRhythmicContainer(RhythmicContainer):
         leaf.attach(sink=sink)
         return leaf
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        parent: RhythmicContainerParent,
+        anchor: TemporalAnchor,
+        size: RhythmicSize,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> LeafRhythmicContainer:
+        leaf: LeafRhythmicContainer = cls(
+            id=id,
+            written_size=size,
+            occupied_size=size,
+            _parent=parent,
+            _anchor=anchor,
+        )
+
+        leaf.attach(sink=sink)
+        return leaf
+
     def attach(
         self,
         *,

@@ -50,6 +50,24 @@ class Tie(NoteToNoteRelation):
         relation.attach(sink=sink)
         return relation
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        start_note: Note,
+        end_note: Note,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> Tie:
+        relation: Tie = cls(
+            id=id,
+            start=start_note,
+            end=end_note,
+        )
+
+        relation.attach(sink=sink)
+        return relation
+
     def attach(self, *, sink: MutationSink = DIRECT_SINK) -> None:
         self._validate_available_notes()
         super().attach(sink=sink)

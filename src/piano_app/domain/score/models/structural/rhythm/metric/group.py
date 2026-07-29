@@ -46,6 +46,26 @@ class GroupRhythmicContainer(RhythmicContainer):
         group.attach(sink=sink)
         return group
 
+    @classmethod
+    def reconstruct(
+        cls,
+        *,
+        id: str,
+        parent: RhythmicContainerParent,
+        written_size: RhythmicSize,
+        occupied_size: RhythmicSize,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> GroupRhythmicContainer:
+        group: GroupRhythmicContainer = cls(
+            id=id,
+            written_size=written_size,
+            occupied_size=occupied_size,
+            _parent=parent,
+        )
+
+        group.attach(sink=sink)
+        return group
+
     def add_child(
         self,
         *,
