@@ -20,45 +20,45 @@ def build_edit_router(*, service: ScoreEditService) -> APIRouter:
     # resolve `score_id` + branch into a real `draft_id`.
 
     @router.get("/document")
-    def get_document(score_id: str) -> dict[str, object]:
-        return service.get_document(draft_id=score_id)
+    async def get_document(score_id: str) -> dict[str, object]:
+        return await service.get_document(draft_id=score_id)
 
     @router.post("/notes")
-    def insert_note(
+    async def insert_note(
         score_id: str,
         command: InsertNoteCommand,
     ) -> dict[str, object]:
-        return service.insert_note(
+        return await service.insert_note(
             draft_id=score_id,
             command=command,
         )
 
     @router.post("/ties")
-    def tie_notes(
+    async def tie_notes(
         score_id: str,
         command: TieNotesCommand,
     ) -> dict[str, object]:
-        return service.tie_notes(
+        return await service.tie_notes(
             draft_id=score_id,
             command=command,
         )
 
     @router.post("/batch-delete")
-    def delete_batch(
+    async def delete_batch(
         score_id: str,
         command: DeleteBatchCommand,
     ) -> dict[str, object]:
-        return service.delete_batch(
+        return await service.delete_batch(
             draft_id=score_id,
             command=command,
         )
 
     @router.post("/undo")
-    def undo(score_id: str) -> dict[str, object]:
-        return service.undo(draft_id=score_id)
+    async def undo(score_id: str) -> dict[str, object]:
+        return await service.undo(draft_id=score_id)
 
     @router.post("/redo")
-    def redo(score_id: str) -> dict[str, object]:
-        return service.redo(draft_id=score_id)
+    async def redo(score_id: str) -> dict[str, object]:
+        return await service.redo(draft_id=score_id)
 
     return router

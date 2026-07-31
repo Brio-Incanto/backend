@@ -7,7 +7,6 @@ from piano_app.application.contracts.score import (
 )
 from piano_app.application.errors import (
     EditDraftNotFoundError,
-    EditHistoryEmptyError,
     EditRejectedError,
 )
 from piano_app.application.ports import DraftHistory
@@ -43,98 +42,92 @@ class ScoreEditService:
         self._compiler: MutationCompiler = compiler
         self._drafts_history: DraftHistory = history
 
-    def get_document(self, *, draft_id: str) -> dict[str, object]:
-        document: ScoreDocument = self._load(draft_id=draft_id)
+    async def get_document(self, *, draft_id: str) -> dict[str, object]:
+        document: ScoreDocument = await self._load(draft_id=draft_id)
         return ScoreEditView(document=document).jsonify()
 
-    def insert_note(
+    async def insert_note(
         self,
         *,
         draft_id: str,
         command: InsertNoteCommand,
     ) -> dict[str, object]:
-        document: ScoreDocument = self._load(draft_id=draft_id)
+        document: ScoreDocument = await self._load(draft_id=draft_id)
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_insert_note(
                 document=document,
                 intent=command,
             )
-            self._run(draft_id=draft_id, document=document, requests=requests)
+            self._run(document=document, requests=requests)
         except MutationRejectedError as error:
             raise EditRejectedError(reason=error.reason) from error
 
+        await self._drafts_history.commit(draft_id=draft_id, document=document)
         return ScoreEditView(document=document).jsonify()
 
-    def tie_notes(
+    async def tie_notes(
         self,
         *,
         draft_id: str,
         command: TieNotesCommand,
     ) -> dict[str, object]:
-        document: ScoreDocument = self._load(draft_id=draft_id)
+        document: ScoreDocument = await self._load(draft_id=draft_id)
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_tie_notes(
                 document=document,
                 intent=command,
             )
-            self._run(draft_id=draft_id, document=document, requests=requests)
+            self._run(document=document, requests=requests)
         except MutationRejectedError as error:
             raise EditRejectedError(reason=error.reason) from error
 
+        await self._drafts_history.commit(draft_id=draft_id, document=document)
         return ScoreEditView(document=document).jsonify()
 
-    def delete_batch(
+    async def delete_batch(
         self,
         *,
         draft_id: str,
         command: DeleteBatchCommand,
     ) -> dict[str, object]:
-        document: ScoreDocument = self._load(draft_id=draft_id)
+        document: ScoreDocument = await self._load(draft_id=draft_id)
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_delete_batch(
                 document=document,
                 intent=command,
             )
-            self._run(draft_id=draft_id, document=document, requests=requests)
+            self._run(document=document, requests=requests)
         except MutationRejectedError as error:
             raise EditRejectedError(reason=error.reason) from error
 
+        await self._drafts_history.commit(draft_id=draft_id, document=document)
         return ScoreEditView(document=document).jsonify()
 
-    def undo(self, *, draft_id: str) -> dict[str, object]:
+    async def undo(self, *, draft_id: str) -> dict[str, object]:
+        # An empty history is a successful no-op, not an error: the request was
+        # understood and the draft is left in a valid state.
+        # Return the current view either way
         try:
-            undone: bool = self._drafts_history.undo(draft_id=draft_id)
+            await self._drafts_history.undo(draft_id=draft_id)
         except DraftNotFoundError as error:
             raise EditDraftNotFoundError(draft_id=error.draft_id) from error
 
-        if not undone:
-            raise EditHistoryEmptyError(operation="undo")
+        return ScoreEditView(document=await self._load(draft_id=draft_id)).jsonify()
 
-        return ScoreEditView(document=self._load(draft_id=draft_id)).jsonify()
-
-    def redo(self, *, draft_id: str) -> dict[str, object]:
+    async def redo(self, *, draft_id: str) -> dict[str, object]:
         try:
-            redone: bool = self._drafts_history.redo(draft_id=draft_id)
+            await self._drafts_history.redo(draft_id=draft_id)
         except DraftNotFoundError as error:
             raise EditDraftNotFoundError(draft_id=error.draft_id) from error
 
-        if not redone:
-            raise EditHistoryEmptyError(operation="redo")
+        return ScoreEditView(document=await self._load(draft_id=draft_id)).jsonify()
 
-        return ScoreEditView(document=self._load(draft_id=draft_id)).jsonify()
-
-    def _load(self, *, draft_id: str) -> ScoreDocument:
+    async def _load(self, *, draft_id: str) -> ScoreDocument:
         try:
-            return self._drafts_history.load(draft_id=draft_id)
+            return await self._drafts_history.load(draft_id=draft_id)
         except DraftNotFoundError as error:
             raise EditDraftNotFoundError(draft_id=error.draft_id) from error
 
-    def _run(
-        self,
-        *,
-        draft_id: str,
-        document: ScoreDocument,
-        requests: Sequence[MutationRequest],
-    ) -> None:
+    # TODO consider moving commit here
+    def _run(self, *, document: ScoreDocument, requests: Sequence[MutationRequest]) -> None:
         self._engine.process(document=document, requests=requests)
-        self._drafts_history.commit(draft_id=draft_id, document=document)

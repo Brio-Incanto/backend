@@ -8,3 +8,8 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=True,
     )
+
+    # off by default — local dev works without a Redis instance running;
+    # turn on explicitly once one is available.
+    USE_REDIS_DRAFT_HISTORY: bool = False
+    REDIS_URL: str = "redis://localhost:6379/0"

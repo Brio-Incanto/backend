@@ -12,11 +12,3 @@ class EditRejectedError(Exception):
     def __init__(self, *, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
-
-
-class EditHistoryEmptyError(Exception):
-    """Raised when an edit cannot be undone or redone because the edit history is empty."""
-
-    def __init__(self, *, operation: str) -> None:
-        super().__init__(f"Nothing to {operation}.")
-        self.operation = operation

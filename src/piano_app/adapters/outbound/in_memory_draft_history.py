@@ -57,14 +57,14 @@ class InMemoryDraftHistory:
 
         return history
 
-    def load(self, *, draft_id: str) -> ScoreDocument:
+    async def load(self, *, draft_id: str) -> ScoreDocument:
         return self._history_for(draft_id=draft_id).load()
 
-    def commit(self, *, draft_id: str, document: ScoreDocument) -> None:
+    async def commit(self, *, draft_id: str, document: ScoreDocument) -> None:
         self._history_for(draft_id=draft_id).push(document=document)
 
-    def undo(self, *, draft_id: str) -> bool:
+    async def undo(self, *, draft_id: str) -> bool:
         return self._history_for(draft_id=draft_id).undo()
 
-    def redo(self, *, draft_id: str) -> bool:
+    async def redo(self, *, draft_id: str) -> bool:
         return self._history_for(draft_id=draft_id).redo()

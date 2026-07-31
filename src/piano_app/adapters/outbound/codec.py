@@ -577,11 +577,23 @@ class _Deserializer:
         )
 
 
+class CodecError(Exception):
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 class ScoreDocumentCodec:
     def serialize(self, document: ScoreDocument) -> dict[str, Any]:
-        serializer: _Serializer = _Serializer(document=document)
-        return serializer.serialize()
+        try:
+            serializer: _Serializer = _Serializer(document=document)
+            return serializer.serialize()
+        except Exception as e:
+            raise CodecError(reason=str(e)) from e
 
     def deserialize(self, data: dict[str, Any]) -> ScoreDocument:
-        deserializer: _Deserializer = _Deserializer(data=data)
-        return deserializer.deserialize()
+        try:
+            deserializer: _Deserializer = _Deserializer(data=data)
+            return deserializer.deserialize()
+        except Exception as e:
+            raise CodecError(reason=str(e)) from e

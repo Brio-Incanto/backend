@@ -21,6 +21,6 @@ class DraftStore(Protocol):
     The interface of this store is intended to work with already existing drafts.
     """
 
-    def load(self, *, draft_id: str) -> ScoreDocument:
+    async def load(self, *, draft_id: str) -> ScoreDocument:
         """Raises ``DraftNotFoundError`` if ``draft_id`` has no working copy."""
         ...
