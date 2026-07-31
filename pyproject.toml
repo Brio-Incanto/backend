@@ -13,6 +13,7 @@ dependencies = [
     "pydantic-settings>=2.13",
     "fastapi>=0.115",
     "uvicorn>=0.34",
+    "redis>=5.2",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +25,10 @@ dev = [
     "pre-commit>=4.2",
     "httpx>=0.28",
     "anyio",
+    "fakeredis>=2.26",
+    # fakeredis's EVAL/EVALSHA (used by RedisDraftHistory's Lua scripts) needs this —
+    # without it fakeredis raises "unknown command 'evalsha'".
+    "lupa>=2.0",
 ]
 
 [tool.hatch.build.targets.wheel]
