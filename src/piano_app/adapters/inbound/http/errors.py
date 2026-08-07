@@ -2,13 +2,17 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from piano_app.application.errors import (
+    EditConflictError,
     EditDraftNotFoundError,
     EditRejectedError,
+    MissingScoreError,
 )
 
 _APPLICATION_ERROR_STATUS: dict[type[Exception], int] = {
+    EditConflictError: status.HTTP_409_CONFLICT,
     EditDraftNotFoundError: status.HTTP_404_NOT_FOUND,
     EditRejectedError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    MissingScoreError: status.HTTP_404_NOT_FOUND,
 }
 
 
