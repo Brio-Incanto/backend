@@ -1,5 +1,4 @@
 from piano_app.domain.score.document.models.relations import Relation
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions.actions.relations import (
@@ -10,7 +9,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.rel
 )
 
 
-class DeleteRelationAnalyzer(MutationAnalyzer[DeleteRelationRequest]):
+class DeleteRelationAnalyzer:
     """Decides direct deletion of a relation because it owns no child entities."""
 
     def analyze(

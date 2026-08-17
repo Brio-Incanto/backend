@@ -6,7 +6,7 @@ from redis.commands.core import AsyncScript
 
 from piano_app.adapters.outbound.shared.codec import ScoreDocumentCodec
 from piano_app.adapters.outbound.shared.draft_snapshot import DraftSnapshot
-from piano_app.application.ports.draft_store import (
+from piano_app.application.ports.score.draft_store import (
     DraftNotFoundError,
     DraftVersionClashError,
     VersionedDraftDocument,

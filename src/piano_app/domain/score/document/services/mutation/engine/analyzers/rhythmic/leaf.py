@@ -15,7 +15,6 @@ from piano_app.domain.score.document.services.helpers.searching import (
     find_intersections,
     locate_in_deepest_scope,
 )
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import (
@@ -41,7 +40,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.tem
 )
 
 
-class CreateLeafAnalyzer(MutationAnalyzer[CreateLeafRequest]):
+class CreateLeafAnalyzer:
     """Decides placement and displacement for a new metric leaf.
 
     Its start selects the deepest containing rhythmic scope; spilling across that
@@ -111,7 +110,7 @@ class CreateLeafAnalyzer(MutationAnalyzer[CreateLeafRequest]):
         return buffer
 
 
-class DeleteLeafAnalyzer(MutationAnalyzer[DeleteLeafRequest]):
+class DeleteLeafAnalyzer:
     """Decides the metric leaf's deletion cascade.
 
     An attached note or rest carrier is deleted before the leaf; grace-group

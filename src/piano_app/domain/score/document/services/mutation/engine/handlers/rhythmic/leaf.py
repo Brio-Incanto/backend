@@ -4,15 +4,14 @@ from piano_app.domain.score.document.models.structural.rhythm import (
     LeafRhythmicContainer,
     RhythmicContainerParent,
 )
-from piano_app.domain.score.document.services.mutation.engine.handlers.base import MutationHandler
-from piano_app.domain.score.document.services.mutation.engine.resolver import Resolver
+from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions.actions.rhythmic import (
     CreateLeafAction,
     DeleteLeafAction,
 )
 
 
-class CreateLeafHandler(MutationHandler[CreateLeafAction]):
+class CreateLeafHandler:
     """Creates a leaf rhythmic container, at its anchor and inside its optional
     parent group (resolved from the environment)."""
 
@@ -20,7 +19,7 @@ class CreateLeafHandler(MutationHandler[CreateLeafAction]):
         self,
         *,
         action: CreateLeafAction,
-        resolve: Resolver,
+        resolve: ResolveBound,
         sink: MutationSink,
     ) -> LeafRhythmicContainer:
         anchor: TemporalAnchor = resolve(action.anchor)
@@ -35,14 +34,14 @@ class CreateLeafHandler(MutationHandler[CreateLeafAction]):
         return leaf
 
 
-class DeleteLeafHandler(MutationHandler[DeleteLeafAction]):
+class DeleteLeafHandler:
     """Detaches a leaf from its parent scope."""
 
     def handle(
         self,
         *,
         action: DeleteLeafAction,
-        resolve: Resolver,
+        resolve: ResolveBound,
         sink: MutationSink,
     ) -> None:
         leaf: LeafRhythmicContainer = action.target

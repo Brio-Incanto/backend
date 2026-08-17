@@ -9,7 +9,6 @@ from piano_app.domain.score.document.services.helpers import (
     translate_to_root,
     voice_of,
 )
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import MutationRejectedError
@@ -21,7 +20,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.rel
 )
 
 
-class CreateTieAnalyzer(MutationAnalyzer[CreateTieRequest]):
+class CreateTieAnalyzer:
     """Decides whether two metric notes may be connected by a tie.
 
     Their carriers must be consecutive and touching in one voice, with the

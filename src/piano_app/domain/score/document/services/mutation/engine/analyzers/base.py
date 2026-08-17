@@ -1,11 +1,11 @@
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import MutationRequest
 
 
-class MutationAnalyzer[R: MutationRequest](ABC):
+class MutationAnalyzer[R: MutationRequest](Protocol):
     """Decomposes one request into ordered work items.
 
     An analyzer may emit further requests (recursive decomposition on *other*
@@ -15,5 +15,4 @@ class MutationAnalyzer[R: MutationRequest](ABC):
     is a legitimate no-op.
     """
 
-    @abstractmethod
     def analyze(self, *, request: R, resolver: ResolveBound) -> EmitBuffer: ...

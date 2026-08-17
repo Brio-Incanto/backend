@@ -2,7 +2,6 @@ from piano_app.domain.score.document.models.structural.rhythm import (
     GroupRhythmicContainer,
     LeafRhythmicContainer,
 )
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions.actions.rhythmic import (
@@ -14,7 +13,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.rhy
 )
 
 
-class DeleteRhythmicGroupAnalyzer(MutationAnalyzer[DeleteRhythmicGroupRequest]):
+class DeleteRhythmicGroupAnalyzer:
     """Decides the rhythmic group's deletion cascade.
 
     Every direct leaf and subgroup triggers its own deletion before the group.

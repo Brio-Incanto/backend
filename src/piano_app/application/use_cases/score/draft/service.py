@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from piano_app.application.errors import EditDraftNotFoundError, MissingScoreError
 from piano_app.application.ports import ScoreUoWFactory
-from piano_app.application.ports.draft_store import (
+from piano_app.application.ports.score.draft_store import (
     DraftNotFoundError,
     DraftStore,
     VersionedDraftDocument,
@@ -44,13 +44,15 @@ class DraftService:
             draft_id=versioned.draft_id, view=ScoreView(document=versioned.document)
         )
 
-    async def create_draft_from_score(self, *, author_id: str, score_id: str) -> CreatedDraft:
+    async def create_draft_from_score(self, *, score_id: str, author_id: str) -> CreatedDraft:
         async with self._score_uow_factory() as uow:
             # read-only, the uow's rollback-on-exit is a no-op, no explicit commit needed
-            base_score: Score | None = await uow.score_repository.get(score_id=score_id)
+            base_score: Score | None = await uow.score_repository.get(
+                score_id=score_id, viewer_id=author_id
+            )
 
-        if base_score is None:
-            raise MissingScoreError(score_id=score_id)
+            if base_score is None:
+                raise MissingScoreError(score_id=score_id)
 
         versioned: VersionedDraftDocument = await self._storage.create(
             author_id=author_id,
