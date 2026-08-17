@@ -2,7 +2,7 @@ from copy import deepcopy
 from typing import Final
 from uuid import uuid4
 
-from piano_app.application.ports.draft_store import (
+from piano_app.application.ports.score.draft_store import (
     DraftNotFoundError,
     DraftVersionClashError,
     VersionedDraftDocument,

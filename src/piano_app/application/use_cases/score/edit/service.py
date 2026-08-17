@@ -11,7 +11,7 @@ from piano_app.application.errors import (
     EditRejectedError,
 )
 from piano_app.application.ports import DraftHistory
-from piano_app.application.ports.draft_store import (
+from piano_app.application.ports.score.draft_store import (
     DraftNotFoundError,
     DraftVersionClashError,
     VersionedDraftDocument,

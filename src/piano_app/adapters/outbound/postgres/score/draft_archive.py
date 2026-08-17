@@ -3,10 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from piano_app.adapters.outbound.shared.codec import ScoreDocumentCodec, SerializedScoreDocument
 from piano_app.adapters.outbound.shared.draft_snapshot import DraftSnapshot
-from piano_app.application.ports.draft_store import DraftNotFoundError
+from piano_app.application.ports.score.draft_store import DraftNotFoundError
 from piano_app.domain.score.document import ScoreDocument
 
-from .schema import DraftORM
+from ..schema import DraftORM
 
 
 class PostgresDraftArchive:

@@ -2,7 +2,6 @@ from piano_app.domain.score.document.models.material import NoteCarrier, Rest, R
 from piano_app.domain.score.document.models.notation import RhythmicSize
 from piano_app.domain.score.document.models.structural.rhythm import LeafRhythmicContainer
 from piano_app.domain.score.document.services.helpers import find_leaf_at
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import Bound, ResultRef
@@ -24,7 +23,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.rhy
 )
 
 
-class CreateRestCarrierAnalyzer(MutationAnalyzer[CreateRestCarrierRequest]):
+class CreateRestCarrierAnalyzer:
     """Decides the metric owner of a new rest carrier.
 
     A same-size leaf is reused after deleting its current carrier; otherwise
@@ -80,7 +79,7 @@ class CreateRestCarrierAnalyzer(MutationAnalyzer[CreateRestCarrierRequest]):
         return buffer
 
 
-class DeleteRestCarrierAnalyzer(MutationAnalyzer[DeleteRestCarrierRequest]):
+class DeleteRestCarrierAnalyzer:
     """Decides the rest carrier's deletion cascade.
 
     A group relation is deleted only when it cannot remain valid without this

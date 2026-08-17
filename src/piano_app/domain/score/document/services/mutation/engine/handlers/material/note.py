@@ -1,21 +1,20 @@
 from piano_app.domain.score.document.models.material import Note, NoteCarrier
 from piano_app.domain.score.document.models.mutation_sink import MutationSink
-from piano_app.domain.score.document.services.mutation.engine.handlers.base import MutationHandler
-from piano_app.domain.score.document.services.mutation.engine.resolver import Resolver
+from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions.actions.material import (
     CreateNoteAction,
     DeleteNoteAction,
 )
 
 
-class CreateNoteHandler(MutationHandler[CreateNoteAction]):
+class CreateNoteHandler:
     """Creates a note inside its carrier (resolved from the environment)."""
 
     def handle(
         self,
         *,
         action: CreateNoteAction,
-        resolve: Resolver,
+        resolve: ResolveBound,
         sink: MutationSink,
     ) -> Note:
         carrier: NoteCarrier = resolve(action.note_carrier)
@@ -30,14 +29,14 @@ class CreateNoteHandler(MutationHandler[CreateNoteAction]):
         return note
 
 
-class DeleteNoteHandler(MutationHandler[DeleteNoteAction]):
+class DeleteNoteHandler:
     """Detaches a note from its carrier."""
 
     def handle(
         self,
         *,
         action: DeleteNoteAction,
-        resolve: Resolver,
+        resolve: ResolveBound,
         sink: MutationSink,
     ) -> None:
         note: Note = action.target

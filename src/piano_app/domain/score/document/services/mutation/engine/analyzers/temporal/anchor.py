@@ -2,7 +2,6 @@ from itertools import chain
 
 from piano_app.domain.score.document.models.structural import TemporalAnchor
 from piano_app.domain.score.document.services.helpers import find_anchor_at
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import MutationRejectedError
@@ -19,7 +18,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.tem
 )
 
 
-class CreateTemporalAnchorAnalyzer(MutationAnalyzer[CreateTemporalAnchorRequest]):
+class CreateTemporalAnchorAnalyzer:
     """Decides whether an anchor may be created at the requested measure position.
 
     An existing anchor at that exact position rejects the request; otherwise a new
@@ -55,7 +54,7 @@ class CreateTemporalAnchorAnalyzer(MutationAnalyzer[CreateTemporalAnchorRequest]
         return buffer
 
 
-class DeleteTemporalAnchorAnalyzer(MutationAnalyzer[DeleteTemporalAnchorRequest]):
+class DeleteTemporalAnchorAnalyzer:
     """Decides the temporal anchor's deletion cascade.
 
     All attached metric leaves are deleted before the anchor; attached contexts

@@ -2,12 +2,20 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Protocol, Self
 
+from .author_repository import AuthorRepository
+from .catalog_query import ScoreCatalogQuery
 from .score_repository import ScoreRepository
 
 
 class ScoreUoW(Protocol):
     @property
     def score_repository(self) -> ScoreRepository: ...
+
+    @property
+    def catalog_query(self) -> ScoreCatalogQuery: ...
+
+    @property
+    def author_repository(self) -> AuthorRepository: ...
 
     async def __aenter__(self) -> Self: ...
 

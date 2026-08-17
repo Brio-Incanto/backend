@@ -1,7 +1,6 @@
 from piano_app.domain.score.document.models.material import Carrier, Note, NoteCarrier
 from piano_app.domain.score.document.models.structural.rhythm import LeafRhythmicContainer
 from piano_app.domain.score.document.services.helpers import find_leaf_at
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import Bound, ResultRef
@@ -19,14 +18,19 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.rel
 )
 
 
-class CreateNoteAnalyzer(MutationAnalyzer[CreateNoteRequest]):
+class CreateNoteAnalyzer:
     """Decides where to create a note in the requested voice slot.
 
     A same-size leaf with a note carrier triggers a chord join; every other slot
     state delegates creation of a suitable carrier.
     """
 
-    def analyze(self, *, request: CreateNoteRequest, resolver: ResolveBound) -> EmitBuffer:
+    def analyze(
+        self,
+        *,
+        request: CreateNoteRequest,
+        resolver: ResolveBound,
+    ) -> EmitBuffer:
         buffer: EmitBuffer = EmitBuffer(request=request)
 
         leaf: LeafRhythmicContainer | None = find_leaf_at(
@@ -77,14 +81,19 @@ class CreateNoteAnalyzer(MutationAnalyzer[CreateNoteRequest]):
         return buffer
 
 
-class DeleteNoteAnalyzer(MutationAnalyzer[DeleteNoteRequest]):
+class DeleteNoteAnalyzer:
     """Decides the note's deletion cascade.
 
     Note-to-note relations are deleted before the note. Cleanup of an empty
     carrier is deferred to the mutation boundary.
     """
 
-    def analyze(self, *, request: DeleteNoteRequest, resolver: ResolveBound) -> EmitBuffer:
+    def analyze(
+        self,
+        *,
+        request: DeleteNoteRequest,
+        resolver: ResolveBound,
+    ) -> EmitBuffer:
         buffer: EmitBuffer = EmitBuffer(request=request)
         note: Note = request.target
 

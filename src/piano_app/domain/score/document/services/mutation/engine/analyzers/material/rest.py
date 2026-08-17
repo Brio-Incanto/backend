@@ -1,7 +1,6 @@
 from piano_app.domain.score.document.models.material import Carrier, Rest, RestCarrier
 from piano_app.domain.score.document.models.structural.rhythm import LeafRhythmicContainer
 from piano_app.domain.score.document.services.helpers import find_leaf_at
-from piano_app.domain.score.document.services.mutation.engine.analyzers.base import MutationAnalyzer
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import Bound, ResultRef
@@ -16,7 +15,7 @@ from piano_app.domain.score.document.services.mutation.instructions.requests.mat
 )
 
 
-class CreateRestAnalyzer(MutationAnalyzer[CreateRestRequest]):
+class CreateRestAnalyzer:
     """Decides where to create a rest in the requested voice slot.
 
     A same-size leaf with a rest carrier triggers replacement of its rest; every
@@ -75,7 +74,7 @@ class CreateRestAnalyzer(MutationAnalyzer[CreateRestRequest]):
         return buffer
 
 
-class DeleteRestAnalyzer(MutationAnalyzer[DeleteRestRequest]):
+class DeleteRestAnalyzer:
     """Decides direct deletion of a rest because it owns no child entities."""
 
     def analyze(

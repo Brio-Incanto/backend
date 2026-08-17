@@ -1,6 +1,7 @@
 from enum import StrEnum
-from typing import ClassVar
+from typing import ClassVar, Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,13 +23,37 @@ class DraftHistoryBackend(StrEnum):
 
 
 class Settings(BaseSettings):
+    """One flat env-var namespace (pydantic-settings' default source), grouped
+    below by what each field configures — NOT nested into real sub-models: a
+    nested ``BaseModel`` only picks up flat top-level env vars (``JWT_SECRET``)
+    via a custom settings source, not for free, and this project's ``.env``
+    already commits to the flat names (verified before choosing this shape)."""
+
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         extra="ignore",
         case_sensitive=True,
     )
 
-    # in-process by default — local dev works without Redis/Postgres running;
-    # switch explicitly once the backing service(s) are available.
+    # --- Persistence: which draft-history adapter, and its backing stores.
+    # Postgres is unconditional (canon scores + auth, regardless of this
+    # switch); Redis is only read for the REDIS/TIERED backends.
     DRAFT_HISTORY_BACKEND: DraftHistoryBackend = DraftHistoryBackend.MEMORY
-    REDIS_URL: str = "redis://localhost:6379/0"
-    DATABASE_URL: str = "postgresql+asyncpg://piano:piano@localhost:5432/piano"
+    DATABASE_URL: str
+    REDIS_URL: str | None = None
+
+    # --- Google Sign-In: the id_token audience(s) this deployment accepts.
+    GOOGLE_CLIENT_IDS: tuple[str, ...] = ()
+
+    # --- Access tokens (JWT): issuance and verification.
+    JWT_SECRET: SecretStr
+    JWT_ISSUER: str = "piano-app"
+    JWT_AUDIENCE: str = "piano-api"
+    JWT_ACCESS_TTL_SECONDS: int = 30 * 60
+
+    # --- Refresh sessions / cookie.
+    AUTH_REFRESH_TTL_SECONDS: int = 30 * 24 * 60 * 60
+    AUTH_REFRESH_COOKIE_SECURE: bool = True
+    AUTH_REFRESH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+
+    # --- HTTP: CORS.
+    CORS_ORIGINS: tuple[str, ...] = ()
