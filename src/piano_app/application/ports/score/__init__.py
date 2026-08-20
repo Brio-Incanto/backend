@@ -2,27 +2,33 @@ from .author_repository import AuthorProfile, AuthorRepository
 from .catalog_query import ScoreCatalogQuery, ScoreMetaItem
 from .draft_history import DraftHistory
 from .draft_store import (
-    DraftNotFoundError,
+    DraftMeta,
     DraftStore,
-    DraftVersionClashError,
+    DraftStoreNotFoundError,
+    DraftStoreVersionConflictError,
     VersionedDraftDocument,
 )
-from .score_repository import ScoreNotFoundError, ScoreRepository, ScoreVersionClashError
+from .score_repository import (
+    ScoreRepository,
+    ScoreRepositoryNotFoundError,
+    ScoreRepositoryVersionConflictError,
+)
 from .uow import ScoreUoW, ScoreUoWFactory
 
 __all__ = (
     "AuthorProfile",
     "AuthorRepository",
     "DraftHistory",
-    "DraftNotFoundError",
+    "DraftMeta",
     "DraftStore",
-    "DraftVersionClashError",
+    "DraftStoreNotFoundError",
+    "DraftStoreVersionConflictError",
     "ScoreCatalogQuery",
     "ScoreMetaItem",
-    "ScoreNotFoundError",
     "ScoreRepository",
+    "ScoreRepositoryNotFoundError",
+    "ScoreRepositoryVersionConflictError",
     "ScoreUoW",
     "ScoreUoWFactory",
-    "ScoreVersionClashError",
     "VersionedDraftDocument",
 )

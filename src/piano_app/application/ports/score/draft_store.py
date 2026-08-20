@@ -1,41 +1,74 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from datetime import datetime
+from typing import Protocol, Self
 
 from piano_app.domain.score.document import ScoreDocument
 
 
-class DraftNotFoundError(Exception):
-    """Raised by a ``DraftStore``/``DraftHistory`` implementation when a draft id has
-    no working copy."""
+class DraftStoreNotFoundError(Exception):
+    """Raised when a required draft disappears from the store."""
 
     def __init__(self, *, draft_id: str) -> None:
-        super().__init__(f"No draft with id {draft_id!r}.")
+        super().__init__(f"No stored draft with id {draft_id!r}.")
         self.draft_id: str = draft_id
 
 
-class DraftVersionClashError(Exception):
-    """Raised when a draft operation is based on an outdated version."""
+class DraftStoreVersionConflictError(Exception):
+    """Raised when a write is based on an outdated stored draft version."""
 
     def __init__(self, *, draft_id: str, version: int | None) -> None:
-        message: str = (
-            f"Draft {draft_id!r} already exists."
-            if version is None
-            else f"Version {version} of draft {draft_id!r} has already moved forward."
-        )
-        super().__init__(message)
+        super().__init__(f"Stored draft {draft_id!r} is no longer at version {version!r}.")
         self.draft_id: str = draft_id
         self.version: int | None = version
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DraftMeta:
+    """Metadata about a draft."""
+
+    draft_id: str
+    title: str
+    author_id: str
+    ref_score_id: str | None
+    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class VersionedDraftDocument:
     """A score document paired with the draft version it was loaded from."""
 
-    draft_id: str
+    meta: DraftMeta
     document: ScoreDocument
     version: int
-    author_id: str
-    ref_score_id: str | None
+
+    @property
+    def draft_id(self) -> str:
+        return self.meta.draft_id
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        draft_id: str,
+        title: str,
+        author_id: str,
+        ref_score_id: str | None,
+        updated_at: datetime,
+        document: ScoreDocument,
+        version: int,
+    ) -> Self:
+        return cls(
+            meta=DraftMeta(
+                draft_id=draft_id,
+                title=title,
+                author_id=author_id,
+                ref_score_id=ref_score_id,
+                updated_at=updated_at,
+            ),
+            document=document,
+            version=version,
+        )
 
 
 class DraftStore(Protocol):
@@ -49,6 +82,7 @@ class DraftStore(Protocol):
     async def create(
         self,
         *,
+        title: str,
         author_id: str,
         ref_score_id: str | None,
         document: ScoreDocument,
@@ -56,6 +90,10 @@ class DraftStore(Protocol):
         """Creates initial draft with a fresh document."""
         ...
 
-    async def load(self, *, draft_id: str) -> VersionedDraftDocument:
-        """Raises ``DraftNotFoundError`` if ``draft_id`` has no working copy."""
+    async def get(self, *, draft_id: str) -> VersionedDraftDocument | None:
+        """Returns ``None`` if ``draft_id`` has no working copy."""
+        ...
+
+    async def list_by_author(self, *, author_id: str) -> Sequence[DraftMeta]:
+        """Returns all drafts created by ``author_id``."""
         ...

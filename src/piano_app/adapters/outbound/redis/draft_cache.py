@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from typing import Final
 
 from redis.asyncio import Redis
@@ -6,106 +7,26 @@ from redis.commands.core import AsyncScript
 
 from piano_app.adapters.outbound.shared.codec import ScoreDocumentCodec
 from piano_app.adapters.outbound.shared.draft_snapshot import DraftSnapshot
-from piano_app.application.ports.score.draft_store import (
-    DraftNotFoundError,
-    DraftVersionClashError,
+from piano_app.application.ports.score import (
+    DraftStoreNotFoundError,
+    DraftStoreVersionConflictError,
     VersionedDraftDocument,
 )
 from piano_app.domain.score.document import ScoreDocument
 
-from .shared_lua_scripts import _COMMIT_SCRIPT, _LOAD_SCRIPT, _REDO_SCRIPT, _UNDO_SCRIPT
+from .shared_lua_scripts import _COMMIT_SCRIPT, _GET_SCRIPT, _REDO_SCRIPT, _UNDO_SCRIPT, _load
 
-# TODO compress 4 keys (cursor, version, author, score) into 1 key (draft:draft_id:meta)
-#  that is of HSET type
-# same sentinel/reasoning as RedisDraftHistory's _NO_SCORE_SENTINEL — duplicated
-# rather than shared, matching the existing duplication of _to_str/_serialize/
-# _deserialize/key-builders below (no inheritance between the two Redis adapters,
-# see RedisDraftCache's own docstring).
+# Redis hashes have no native scalar null. The `score` field is required so
+# scripts can distinguish a complete draft with no referenced score from a
+# corrupted meta hash missing the field. Referenced score ids are generated
+# UUIDs, so they cannot collide with this sentinel.
 _NO_SCORE_SENTINEL: Final[str] = "none"
 
 # own to RedisDraftCache only (RedisDraftHistory has neither hydrate() nor
-# load_snapshot()); load/commit/undo/redo are identical hot-tier mechanics shared
+# load_snapshot()); get/commit/undo/redo are identical hot-tier mechanics shared
 # by both, imported from .shared_lua_scripts.
-_HYDRATE_SCRIPT: str = """
-local revisions_key = KEYS[1]
-local cursor_key = KEYS[2]
-local version_key = KEYS[3]
-local author_key = KEYS[4]
-local score_key = KEYS[5]
-
-local cursor = ARGV[1]
-local version = ARGV[2]
-local author_id = ARGV[3]
-local score_id = ARGV[4]
-local ttl_seconds = ARGV[5]
-local revisions_start_arg = 6
-
-local keys_count = redis.call(
-    'EXISTS', revisions_key, cursor_key, version_key, author_key, score_key
-)
-if keys_count == 5 then
-    return {'exists'}
-end
-if keys_count ~= 0 then
-    return {'corrupt', 'partial_keys'}
-end
-
-if ARGV[revisions_start_arg] == nil then
-    return {'corrupt', 'missing_revisions'}
-end
-
-redis.call('RPUSH', revisions_key, unpack(ARGV, revisions_start_arg))
-redis.call('SET', cursor_key, cursor)
-redis.call('SET', version_key, version)
-redis.call('SET', author_key, author_id)
-redis.call('SET', score_key, score_id)
-
-redis.call('EXPIRE', revisions_key, ttl_seconds)
-redis.call('EXPIRE', cursor_key, ttl_seconds)
-redis.call('EXPIRE', version_key, ttl_seconds)
-redis.call('EXPIRE', author_key, ttl_seconds)
-redis.call('EXPIRE', score_key, ttl_seconds)
-
-return {'ok'}
-"""
-
-_LOAD_SNAPSHOT_SCRIPT: str = """
-local revisions_key = KEYS[1]
-local cursor_key = KEYS[2]
-local version_key = KEYS[3]
-local author_key = KEYS[4]
-local score_key = KEYS[5]
-
-local keys_count = redis.call(
-    'EXISTS', revisions_key, cursor_key, version_key, author_key, score_key
-)
-if keys_count == 0 then
-    return {'not_found'}
-end
-if keys_count ~= 5 then
-    return {'corrupt', 'partial_keys'}
-end
-
-local cursor = tonumber(redis.call('GET', cursor_key))
-local revisions_length = redis.call('LLEN', revisions_key)
-if cursor == nil or cursor < 0 or cursor >= revisions_length then
-    return {'corrupt', 'cursor_out_of_range'}
-end
-
-local version = redis.call('GET', version_key)
-if tonumber(version) == nil then
-    return {'corrupt', 'invalid_version'}
-end
-
-return {
-    'ok',
-    cursor,
-    version,
-    redis.call('GET', author_key),
-    redis.call('GET', score_key),
-    unpack(redis.call('LRANGE', revisions_key, 0, -1))
-}
-"""
+_HYDRATE_SCRIPT: str = _load("hydrate.lua")
+_LOAD_SNAPSHOT_SCRIPT: str = _load("load_snapshot.lua")
 
 
 class RedisDraftCache:
@@ -128,24 +49,22 @@ class RedisDraftCache:
         # max number of revisions per draft
         self._MAX_DRAFT_HISTORY_SIZE: Final[int] = max_history_size
         # revision history is automatically deleted from Redis cache after specified TTL
-        # (load() is read-only and does not refresh the TTL)
+        # (get() is read-only and does not refresh the TTL)
         self._DRAFT_TTL_SECONDS: Final[int] = ttl_seconds
 
-        self._load_script: AsyncScript = client.register_script(_LOAD_SCRIPT)
+        self._get_script: AsyncScript = client.register_script(_GET_SCRIPT)
         self._commit_script: AsyncScript = client.register_script(_COMMIT_SCRIPT)
         self._undo_script: AsyncScript = client.register_script(_UNDO_SCRIPT)
         self._redo_script: AsyncScript = client.register_script(_REDO_SCRIPT)
         self._hydrate_script: AsyncScript = client.register_script(_HYDRATE_SCRIPT)
         self._load_snapshot_script: AsyncScript = client.register_script(_LOAD_SNAPSHOT_SCRIPT)
 
-    async def load(self, *, draft_id: str) -> VersionedDraftDocument:
-        response: list[bytes | str | int] = await self._load_script(
+    async def get(self, *, draft_id: str) -> VersionedDraftDocument | None:
+        response: list[bytes | str | int] = await self._get_script(
             keys=[
                 self._revisions_key(draft_id=draft_id),
-                self._cursor_key(draft_id=draft_id),
-                self._version_key(draft_id=draft_id),
-                self._author_key(draft_id=draft_id),
-                self._score_key(draft_id=draft_id),
+                self._state_key(draft_id=draft_id),
+                self._meta_key(draft_id=draft_id),
             ]
         )
 
@@ -154,32 +73,34 @@ class RedisDraftCache:
 
         match response_code:
             case "ok":
-                revision: str = self._to_str(response_body[0])
-                version: int = int(self._to_str(response_body[1]))
+                document: ScoreDocument = self._deserialize(response_body[0])
+                version: int = self._decode_version(response_body[1])
                 author_id: str = self._to_str(response_body[2])
-                ref_score_id: str | None = self._decode_ref_score_id(response_body[3])
-                return VersionedDraftDocument(
+                title: str = self._to_str(response_body[3])
+                updated_at: datetime = self._decode_datetime(response_body[4])
+                ref_score_id: str | None = self._decode_ref_score_id(response_body[5])
+                return VersionedDraftDocument.create(
                     draft_id=draft_id,
-                    document=self._deserialize(revision),
-                    version=version,
+                    title=title,
                     author_id=author_id,
                     ref_score_id=ref_score_id,
+                    updated_at=updated_at,
+                    document=document,
+                    version=version,
                 )
             case "not_found":
-                raise DraftNotFoundError(draft_id=draft_id)
+                return None
             case _:
                 raise RuntimeError(
-                    f"Unexpected Redis load response: {response_code!r}, {response_body!r}."
+                    f"Unexpected Redis get response: {response_code!r}, {response_body!r}."
                 )
 
     async def commit(self, *, draft: VersionedDraftDocument) -> None:
         response: list[bytes | str | int] = await self._commit_script(
             keys=[
                 self._revisions_key(draft_id=draft.draft_id),
-                self._cursor_key(draft_id=draft.draft_id),
-                self._version_key(draft_id=draft.draft_id),
-                self._author_key(draft_id=draft.draft_id),
-                self._score_key(draft_id=draft.draft_id),
+                self._state_key(draft_id=draft.draft_id),
+                self._meta_key(draft_id=draft.draft_id),
             ],
             args=[
                 self._serialize(draft.document),
@@ -196,9 +117,9 @@ class RedisDraftCache:
             case "ok":
                 return
             case "not_found":
-                raise DraftNotFoundError(draft_id=draft.draft_id)
+                raise DraftStoreNotFoundError(draft_id=draft.draft_id)
             case "version_conflict":
-                raise DraftVersionClashError(draft_id=draft.draft_id, version=draft.version)
+                raise DraftStoreVersionConflictError(draft_id=draft.draft_id, version=draft.version)
             case _:
                 raise RuntimeError(
                     f"Unexpected Redis commit response: {response_code!r}, {response_body!r}."
@@ -208,10 +129,8 @@ class RedisDraftCache:
         response: list[bytes | str | int] = await self._undo_script(
             keys=[
                 self._revisions_key(draft_id=draft.draft_id),
-                self._cursor_key(draft_id=draft.draft_id),
-                self._version_key(draft_id=draft.draft_id),
-                self._author_key(draft_id=draft.draft_id),
-                self._score_key(draft_id=draft.draft_id),
+                self._state_key(draft_id=draft.draft_id),
+                self._meta_key(draft_id=draft.draft_id),
             ],
             args=[draft.version, self._DRAFT_TTL_SECONDS],
         )
@@ -225,9 +144,9 @@ class RedisDraftCache:
             case "no_change":
                 return False
             case "not_found":
-                raise DraftNotFoundError(draft_id=draft.draft_id)
+                raise DraftStoreNotFoundError(draft_id=draft.draft_id)
             case "version_conflict":
-                raise DraftVersionClashError(draft_id=draft.draft_id, version=draft.version)
+                raise DraftStoreVersionConflictError(draft_id=draft.draft_id, version=draft.version)
             case _:
                 raise RuntimeError(
                     f"Unexpected Redis undo response: {response_code!r}, {response_body!r}."
@@ -237,10 +156,8 @@ class RedisDraftCache:
         response: list[bytes | str | int] = await self._redo_script(
             keys=[
                 self._revisions_key(draft_id=draft.draft_id),
-                self._cursor_key(draft_id=draft.draft_id),
-                self._version_key(draft_id=draft.draft_id),
-                self._author_key(draft_id=draft.draft_id),
-                self._score_key(draft_id=draft.draft_id),
+                self._state_key(draft_id=draft.draft_id),
+                self._meta_key(draft_id=draft.draft_id),
             ],
             args=[draft.version, self._DRAFT_TTL_SECONDS],
         )
@@ -254,9 +171,9 @@ class RedisDraftCache:
             case "no_change":
                 return False
             case "not_found":
-                raise DraftNotFoundError(draft_id=draft.draft_id)
+                raise DraftStoreNotFoundError(draft_id=draft.draft_id)
             case "version_conflict":
-                raise DraftVersionClashError(draft_id=draft.draft_id, version=draft.version)
+                raise DraftStoreVersionConflictError(draft_id=draft.draft_id, version=draft.version)
             case _:
                 raise RuntimeError(
                     f"Unexpected Redis redo response: {response_code!r}, {response_body!r}."
@@ -269,16 +186,16 @@ class RedisDraftCache:
         response: list[bytes | str | int] = await self._hydrate_script(
             keys=[
                 self._revisions_key(draft_id=snapshot.draft_id),
-                self._cursor_key(draft_id=snapshot.draft_id),
-                self._version_key(draft_id=snapshot.draft_id),
-                self._author_key(draft_id=snapshot.draft_id),
-                self._score_key(draft_id=snapshot.draft_id),
+                self._state_key(draft_id=snapshot.draft_id),
+                self._meta_key(draft_id=snapshot.draft_id),
             ],
             args=[
                 snapshot.cursor,
                 snapshot.version,
                 snapshot.author_id,
+                snapshot.title,
                 self._encode_ref_score_id(snapshot.ref_score_id),
+                self._encode_datetime(snapshot.updated_at),
                 self._DRAFT_TTL_SECONDS,
                 *[self._serialize(revision) for revision in snapshot.revisions],
             ],
@@ -299,10 +216,8 @@ class RedisDraftCache:
         response: list[bytes | str | int] = await self._load_snapshot_script(
             keys=[
                 self._revisions_key(draft_id=draft_id),
-                self._cursor_key(draft_id=draft_id),
-                self._version_key(draft_id=draft_id),
-                self._author_key(draft_id=draft_id),
-                self._score_key(draft_id=draft_id),
+                self._state_key(draft_id=draft_id),
+                self._meta_key(draft_id=draft_id),
             ]
         )
 
@@ -314,22 +229,26 @@ class RedisDraftCache:
                 cursor: int = int(self._to_str(response_body[0]))
                 version: int = int(self._to_str(response_body[1]))
                 author_id: str = self._to_str(response_body[2])
-                ref_score_id: str | None = self._decode_ref_score_id(response_body[3])
+                title: str = self._to_str(response_body[3])
+                updated_at: datetime = self._decode_datetime(response_body[4])
+                ref_score_id: str | None = self._decode_ref_score_id(response_body[5])
                 revisions: list[ScoreDocument] = [
                     self._deserialize(self._to_str(response_body[i]))
-                    for i in range(4, len(response_body))
+                    for i in range(6, len(response_body))
                 ]
 
                 return DraftSnapshot.create(
                     draft_id=draft_id,
                     author_id=author_id,
+                    title=title,
                     ref_score_id=ref_score_id,
+                    updated_at=updated_at,
                     revisions=revisions,
                     cursor=cursor,
                     version=version,
                 )
             case "not_found":
-                raise DraftNotFoundError(draft_id=draft_id)
+                raise DraftStoreNotFoundError(draft_id=draft_id)
             case _:
                 raise RuntimeError(
                     f"Unexpected Redis load snapshot response: "
@@ -349,8 +268,8 @@ class RedisDraftCache:
     def _serialize(self, document: ScoreDocument) -> str:
         return json.dumps(self._codec.serialize(document))
 
-    def _deserialize(self, revision: str) -> ScoreDocument:
-        return self._codec.deserialize(json.loads(revision))
+    def _deserialize(self, value: bytes | str | int) -> ScoreDocument:
+        return self._codec.deserialize(json.loads(self._to_str(value)))
 
     @classmethod
     def _encode_ref_score_id(cls, ref_score_id: str | None) -> str:
@@ -360,22 +279,27 @@ class RedisDraftCache:
         raw: str = self._to_str(value)
         return raw if raw != _NO_SCORE_SENTINEL else None
 
+    def _decode_version(self, value: bytes | str | int) -> int:
+        return int(self._to_str(value))
+
+    @staticmethod
+    def _encode_datetime(value: datetime) -> str:
+        return str(int(value.timestamp()))
+
+    def _decode_datetime(self, value: bytes | str | int) -> datetime:
+        return datetime.fromtimestamp(
+            int(self._to_str(value)),
+            tz=UTC,
+        )
+
     @staticmethod
     def _revisions_key(*, draft_id: str) -> str:
         return f"draft:{draft_id}:revisions"
 
     @staticmethod
-    def _cursor_key(*, draft_id: str) -> str:
-        return f"draft:{draft_id}:cursor"
+    def _state_key(*, draft_id: str) -> str:
+        return f"draft:{draft_id}:state"
 
     @staticmethod
-    def _version_key(*, draft_id: str) -> str:
-        return f"draft:{draft_id}:version"
-
-    @staticmethod
-    def _author_key(*, draft_id: str) -> str:
-        return f"draft:{draft_id}:author"
-
-    @staticmethod
-    def _score_key(*, draft_id: str) -> str:
-        return f"draft:{draft_id}:score"
+    def _meta_key(*, draft_id: str) -> str:
+        return f"draft:{draft_id}:meta"

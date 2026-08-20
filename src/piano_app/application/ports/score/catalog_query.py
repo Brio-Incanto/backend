@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -34,7 +33,7 @@ class ScoreCatalogQuery(Protocol):
 
         ``query`` None/empty is no filter at all; how a non-empty one is matched is the
         read side's business. ``cursor`` is an opaque token from a previous page's
-        ``next_cursor`` — it raises ``InvalidCursorError`` if it cannot be decoded, and
+        ``next_cursor`` — it raises ``PaginationCursorDecodingError`` if it cannot be decoded, and
         the caller resets it to None whenever the filter changes."""
         ...
 
@@ -47,9 +46,20 @@ class ScoreCatalogQuery(Protocol):
         cursor: str | None,
     ) -> Page[ScoreMetaItem]: ...
 
+    async def search_author_scores(
+        self,
+        *,
+        author_id: str,
+        query: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> Page[ScoreMetaItem]: ...
+
     async def get_score_branches(
         self,
         *,
         score_id: str,
         viewer_id: str | None,
-    ) -> Sequence[ScoreMetaItem]: ...
+        limit: int,
+        cursor: str | None,
+    ) -> Page[ScoreMetaItem]: ...

@@ -5,16 +5,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.dml import ReturningUpdate
 
-from piano_app.adapters.outbound.postgres.schema.core import ScoreContentORM, ScoreMetaORM
+from piano_app.adapters.outbound.postgres.system.schema import ScoreContentORM, ScoreMetaORM
 from piano_app.adapters.outbound.shared.codec import ScoreDocumentCodec
 from piano_app.application.ports.score.score_repository import (
-    ScoreNotFoundError,
-    ScoreVersionClashError,
+    ScoreRepositoryNotFoundError,
+    ScoreRepositoryVersionConflictError,
 )
 from piano_app.domain.score import Score, ScoreMeta
 from piano_app.domain.score.document import ScoreDocument
-
-from .helpers.visibility import is_readable_by
 
 
 class PostgresScoreRepository:
@@ -29,15 +27,12 @@ class PostgresScoreRepository:
         self._session: AsyncSession = session
         self._codec: ScoreDocumentCodec = codec
 
-    async def get(self, *, score_id: str, viewer_id: str | None) -> Score | None:
+    async def get(self, *, score_id: str) -> Score | None:
         # get with the lattest version by default
         statement: Select[tuple[ScoreMetaORM, ScoreContentORM]] = (
             select(ScoreMetaORM, ScoreContentORM)
             .join(ScoreContentORM, ScoreContentORM.score_id == ScoreMetaORM.id)
-            .where(
-                ScoreMetaORM.id == score_id,
-                is_readable_by(viewer_id=viewer_id),
-            )
+            .where(ScoreMetaORM.id == score_id)
             .order_by(ScoreContentORM.version.desc())
             .limit(1)
         )
@@ -55,24 +50,17 @@ class PostgresScoreRepository:
         )
 
     async def get_meta(self, *, score_id: str) -> ScoreMeta | None:
-        return await self._load_meta(score_id=score_id, lock=False)
-
-    async def get_meta_for_update(self, *, score_id: str) -> ScoreMeta | None:
-        return await self._load_meta(score_id=score_id, lock=True)
-
-    async def _load_meta(self, *, score_id: str, lock: bool) -> ScoreMeta | None:
         statement: Select[tuple[ScoreMetaORM]] = select(ScoreMetaORM).where(
             ScoreMetaORM.id == score_id
         )
-        if lock:
-            # holds until the surrounding uow commits/rolls back, so a decision
-            # taken from this snapshot still holds when the write lands
-            statement = statement.with_for_update()
 
         result: ScalarResult[ScoreMetaORM] = await self._session.scalars(statement)
         score_orm: ScoreMetaORM | None = result.one_or_none()
 
-        return None if score_orm is None else self._to_meta(score_orm=score_orm)
+        if score_orm is None:
+            return None
+
+        return self._to_meta(score_orm=score_orm)
 
     async def exists(self, *, score_id: str) -> bool:
         statement: Select[tuple[bool]] = select(
@@ -119,7 +107,7 @@ class PostgresScoreRepository:
     async def update_content(self, *, score_id: str, document: ScoreDocument) -> None:
         score_orm: ScoreMetaORM | None = await self._session.get(ScoreMetaORM, score_id)
         if score_orm is None:
-            raise ScoreNotFoundError(score_id=score_id)
+            raise ScoreRepositoryNotFoundError(score_id=score_id)
 
         statement: Select[tuple[ScoreContentORM]] = (
             select(ScoreContentORM)
@@ -145,7 +133,9 @@ class PostgresScoreRepository:
         try:
             await self._session.flush()
         except IntegrityError:
-            raise ScoreVersionClashError(score_id=score_id, version=content_orm.version) from None
+            raise ScoreRepositoryVersionConflictError(
+                score_id=score_id, version=content_orm.version
+            ) from None
 
     async def set_title(self, *, score_id: str, title: str) -> None:
         await self._write_meta(score_id=score_id, title=title)
@@ -169,7 +159,7 @@ class PostgresScoreRepository:
         result: ScalarResult[str] = await self._session.scalars(statement)
 
         if result.one_or_none() is None:
-            raise ScoreNotFoundError(score_id=score_id)
+            raise ScoreRepositoryNotFoundError(score_id=score_id)
 
     @staticmethod
     def _to_meta(*, score_orm: ScoreMetaORM) -> ScoreMeta:

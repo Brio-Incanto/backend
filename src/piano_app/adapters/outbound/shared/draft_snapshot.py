@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from piano_app.domain.score.document import ScoreDocument
 
@@ -24,8 +25,10 @@ class DraftSnapshot:
     """
 
     draft_id: str
+    title: str
     author_id: str
     ref_score_id: str | None
+    updated_at: datetime
     revisions: tuple[ScoreDocument, ...]
     cursor: int
     version: int
@@ -35,16 +38,20 @@ class DraftSnapshot:
         cls,
         *,
         draft_id: str,
+        title: str,
         author_id: str,
         ref_score_id: str | None,
+        updated_at: datetime,
         revisions: Sequence[ScoreDocument],
         cursor: int,
         version: int,
     ) -> DraftSnapshot:
         return cls(
             draft_id=draft_id,
+            title=title,
             author_id=author_id,
             ref_score_id=ref_score_id,
+            updated_at=updated_at,
             revisions=tuple(revisions),
             cursor=cursor,
             version=version,
@@ -53,6 +60,8 @@ class DraftSnapshot:
     def __post_init__(self) -> None:
         if not self.draft_id:
             raise ValueError("draft_id must not be empty")
+        if not self.title:
+            raise ValueError("title must not be empty")
         if not self.author_id:
             raise ValueError("author_id must not be empty")
 

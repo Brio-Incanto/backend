@@ -10,27 +10,23 @@ class UserProfile:
     username: str
 
 
-class UsernameConflictError(Exception):
+class UsernameAlreadyExistsError(Exception):
     def __init__(self, *, username: str) -> None:
-        super().__init__("Username is already in use.")
+        super().__init__(f"Username {username!r} already exists.")
         self.username: str = username
 
 
-class IdentityAlreadyLinkedError(Exception):
-    """Raised on a concurrent link of the same external identity — e.g. two
-    taps of "sign in" racing each other before either commits."""
-
-    def __init__(self) -> None:
-        super().__init__("Identity is already linked to a user.")
+class IdentityLinkConflictError(Exception):
+    """Raised when an external identity is already linked."""
 
 
 class IdentityRepository(Protocol):
     async def create_user(self, *, username: str) -> UserProfile:
-        """Raises ``UsernameConflictError`` if ``username`` is already taken."""
+        """Raises ``UsernameAlreadyExistsError`` if ``username`` is already taken."""
         ...
 
     async def add_identity(self, *, user_id: str, identity: VerifiedIdentity) -> None:
-        """Raises ``IdentityAlreadyLinkedError`` if ``identity`` is already linked
+        """Raises ``IdentityLinkConflictError`` if ``identity`` is already linked
         to a user (including a concurrent link racing this one)."""
         ...
 

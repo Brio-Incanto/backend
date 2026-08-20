@@ -1,8 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, false, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    false,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from piano_app.adapters.outbound.shared.codec import SerializedScoreDocument
 
@@ -89,18 +99,40 @@ class ScoreContentORM(Base):
     )
 
 
+# addition of several versions of a score to a collection should be
+# prohibited at the repository level
 class CollectionScoreORM(Base):
     __tablename__ = "collection_scores"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "collection_id",
+            "score_content_id",
+            name="uq_collection_scores_collection_content",
+        ),
+        # index for paging
+        Index(
+            "ix_collection_scores_collection_added",
+            "collection_id",
+            "added_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String,
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
 
     collection_id: Mapped[str] = mapped_column(
         String,
         ForeignKey("collections.id", ondelete="CASCADE"),
-        primary_key=True,
     )
     score_content_id: Mapped[str] = mapped_column(
         String,
-        ForeignKey("score_contents.id", ondelete="RESTRICT"),
-        primary_key=True,
+        ForeignKey("score_contents.id", ondelete="CASCADE"),
+        index=True,
     )
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -122,9 +154,3 @@ class CollectionORM(Base):
     )
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(String)
-    scores: Mapped[list[ScoreContentORM]] = relationship(
-        secondary=CollectionScoreORM.__table__,
-        order_by=CollectionScoreORM.added_at,
-        lazy="selectin",
-        passive_deletes=True,
-    )

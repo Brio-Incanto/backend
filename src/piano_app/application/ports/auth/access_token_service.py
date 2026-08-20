@@ -8,9 +8,8 @@ class AccessToken:
     expires_in_seconds: int
 
 
-class InvalidAccessTokenError(Exception):
-    def __init__(self) -> None:
-        super().__init__("Access token is invalid or expired.")
+class AccessTokenVerificationError(Exception):
+    """Raised when an access token cannot be verified."""
 
 
 class AccessTokenService(Protocol):
@@ -19,5 +18,5 @@ class AccessTokenService(Protocol):
         ...
 
     def verify(self, *, token: str) -> str:
-        """Raises ``InvalidAccessTokenError`` if the token is invalid, expired, or malformed."""
+        """Raises ``AccessTokenVerificationError`` if verification fails."""
         ...

@@ -3,7 +3,7 @@ so replacing ILIKE with full-text search is rewriting this function and nothing 
 
 from sqlalchemy import ColumnElement, or_, true
 
-from piano_app.adapters.outbound.postgres.schema.core import ScoreMetaORM
+from piano_app.adapters.outbound.postgres.system.schema import ScoreMetaORM
 
 
 def matches(*, query: str | None) -> ColumnElement[bool]:

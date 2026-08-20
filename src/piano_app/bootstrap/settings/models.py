@@ -34,11 +34,12 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
 
-    # --- Persistence: which draft-history adapter, and its backing stores.
-    # Postgres is unconditional (canon scores + auth, regardless of this
-    # switch); Redis is only read for the REDIS/TIERED backends.
+    # --- Persistence: system data and independently stored draft history.
+    # DATABASE_URL is unconditional (canon scores + auth). REDIS_URL is used by
+    # REDIS/TIERED; DRAFT_DATABASE_URL is used only by TIERED's cold archive.
     DRAFT_HISTORY_BACKEND: DraftHistoryBackend = DraftHistoryBackend.MEMORY
     DATABASE_URL: str
+    DRAFT_DATABASE_URL: str | None = None
     REDIS_URL: str | None = None
 
     # --- Google Sign-In: the id_token audience(s) this deployment accepts.

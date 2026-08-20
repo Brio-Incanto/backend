@@ -13,7 +13,7 @@ class DraftHistory(DraftStore, Protocol):
         """Rolls back the most recent gesture.
 
         ``draft.version`` is the version the caller loaded. Raises
-        ``DraftVersionClashError`` if the draft has changed since then.
+        ``DraftStoreVersionConflictError`` if the draft has changed since then.
         Returns ``False`` if there is nothing to undo.
         """
         ...
@@ -22,7 +22,7 @@ class DraftHistory(DraftStore, Protocol):
         """Reapplies the most recently undone gesture.
 
         ``draft.version`` is the version the caller loaded. Raises
-        ``DraftVersionClashError`` if the draft has changed since then.
+        ``DraftStoreVersionConflictError`` if the draft has changed since then.
         Returns ``False`` if there is nothing to redo.
         """
         ...
@@ -30,6 +30,6 @@ class DraftHistory(DraftStore, Protocol):
     async def commit(self, *, draft: VersionedDraftDocument) -> None:
         """Commits a revision if ``draft.version`` is still current.
 
-        Raises ``DraftVersionClashError`` if the draft has changed since it was loaded.
+        Raises ``DraftStoreVersionConflictError`` if the draft has changed since it was loaded.
         """
         ...

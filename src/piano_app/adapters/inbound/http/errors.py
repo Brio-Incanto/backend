@@ -4,17 +4,17 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from piano_app.application.errors import (
-    EditConflictError,
-    EditDraftNotFoundError,
-    EditRejectedError,
+    DraftNotFoundError,
+    DraftVersionConflictError,
     IdentityAlreadyLinkedError,
     InvalidAccessTokenError,
-    InvalidCursorError,
     InvalidExternalCredentialError,
+    InvalidPaginationCursorError,
     InvalidRefreshTokenError,
-    MissingScoreError,
+    ScoreEditRejectedError,
+    ScoreNotFoundError,
     ScoreNotOwnedError,
-    ScoreVersionClashError,
+    ScoreVersionConflictError,
     UsernameConflictError,
     UsernameRequiredError,
 )
@@ -29,7 +29,7 @@ class ErrorMapping:
 
 _ERROR_MAPPINGS: tuple[ErrorMapping, ...] = (
     ErrorMapping(
-        error_type=InvalidCursorError,
+        error_type=InvalidPaginationCursorError,
         status_code=status.HTTP_400_BAD_REQUEST,
     ),
     # RFC 7235: a missing/invalid bearer token gets the Bearer challenge
@@ -54,15 +54,15 @@ _ERROR_MAPPINGS: tuple[ErrorMapping, ...] = (
         status_code=status.HTTP_403_FORBIDDEN,
     ),
     ErrorMapping(
-        error_type=EditDraftNotFoundError,
+        error_type=DraftNotFoundError,
         status_code=status.HTTP_404_NOT_FOUND,
     ),
     ErrorMapping(
-        error_type=MissingScoreError,
+        error_type=ScoreNotFoundError,
         status_code=status.HTTP_404_NOT_FOUND,
     ),
     ErrorMapping(
-        error_type=EditConflictError,
+        error_type=DraftVersionConflictError,
         status_code=status.HTTP_409_CONFLICT,
     ),
     ErrorMapping(
@@ -70,7 +70,7 @@ _ERROR_MAPPINGS: tuple[ErrorMapping, ...] = (
         status_code=status.HTTP_409_CONFLICT,
     ),
     ErrorMapping(
-        error_type=ScoreVersionClashError,
+        error_type=ScoreVersionConflictError,
         status_code=status.HTTP_409_CONFLICT,
     ),
     ErrorMapping(
@@ -78,7 +78,7 @@ _ERROR_MAPPINGS: tuple[ErrorMapping, ...] = (
         status_code=status.HTTP_409_CONFLICT,
     ),
     ErrorMapping(
-        error_type=EditRejectedError,
+        error_type=ScoreEditRejectedError,
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     ),
     ErrorMapping(

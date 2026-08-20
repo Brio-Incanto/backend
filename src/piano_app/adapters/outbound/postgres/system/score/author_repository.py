@@ -1,7 +1,7 @@
 from sqlalchemy import ScalarResult, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from piano_app.adapters.outbound.postgres.schema.core import UserORM
+from piano_app.adapters.outbound.postgres.system.schema import UserORM
 from piano_app.application.ports.score.author_repository import AuthorProfile
 
 

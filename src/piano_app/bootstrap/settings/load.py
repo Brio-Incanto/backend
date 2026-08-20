@@ -15,6 +15,6 @@ def load_environment() -> None:
 
 def load_settings() -> Settings:
     try:
-        return Settings()
+        return Settings()  # type: ignore[call-arg]  # required fields are sourced from env
     except ValidationError as exc:
         raise RuntimeError("Failed to load application settings") from exc

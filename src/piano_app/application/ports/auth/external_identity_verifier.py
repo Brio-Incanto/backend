@@ -12,12 +12,11 @@ class VerifiedIdentity:
     subject: str
 
 
-class InvalidExternalCredentialError(Exception):
-    def __init__(self) -> None:
-        super().__init__("External identity credential is invalid.")
+class ExternalCredentialVerificationError(Exception):
+    """Raised when an external identity credential cannot be verified."""
 
 
 class ExternalIdentityVerifier(Protocol):
     async def verify(self, *, credential: str) -> VerifiedIdentity:
-        """Raises ``InvalidExternalCredentialError`` if the credential fails verification."""
+        """Raises ``ExternalCredentialVerificationError`` if verification fails."""
         ...

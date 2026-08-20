@@ -6,17 +6,17 @@ from piano_app.application.contracts.score import (
     TieNotesCommand,
 )
 from piano_app.application.errors import (
-    EditConflictError,
-    EditDraftNotFoundError,
-    EditRejectedError,
+    DraftNotFoundError,
+    DraftVersionConflictError,
+    ScoreEditRejectedError,
 )
 from piano_app.application.ports import DraftHistory
-from piano_app.application.ports.score.draft_store import (
-    DraftNotFoundError,
-    DraftVersionClashError,
+from piano_app.application.ports.score import (
+    DraftStoreNotFoundError,
+    DraftStoreVersionConflictError,
     VersionedDraftDocument,
 )
-from piano_app.application.use_cases.score.shared.view import ScoreView
+from piano_app.application.use_cases.score.shared import ScoreView, require_accessible_draft
 from piano_app.domain.score.document import ScoreDocument
 from piano_app.domain.score.document.services.mutation import MutationCompiler, MutationEngine
 from piano_app.domain.score.document.services.mutation.instructions import (
@@ -49,10 +49,10 @@ class ScoreEditService:
         self,
         *,
         draft_id: str,
-        author_id: str,
+        actor_id: str,
         command: InsertNoteCommand,
     ) -> ScoreView:
-        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
         document: ScoreDocument = versioned.document
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_insert_note(
@@ -61,7 +61,7 @@ class ScoreEditService:
             )
             self._run(document=document, requests=requests)
         except MutationRejectedError as error:
-            raise EditRejectedError(reason=error.reason) from error
+            raise ScoreEditRejectedError(reason=error.reason) from error
 
         await self._commit(versioned=versioned)
         return ScoreView(document=document)
@@ -70,10 +70,10 @@ class ScoreEditService:
         self,
         *,
         draft_id: str,
-        author_id: str,
+        actor_id: str,
         command: TieNotesCommand,
     ) -> ScoreView:
-        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
         document: ScoreDocument = versioned.document
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_tie_notes(
@@ -82,7 +82,7 @@ class ScoreEditService:
             )
             self._run(document=document, requests=requests)
         except MutationRejectedError as error:
-            raise EditRejectedError(reason=error.reason) from error
+            raise ScoreEditRejectedError(reason=error.reason) from error
 
         await self._commit(versioned=versioned)
         return ScoreView(document=document)
@@ -91,10 +91,10 @@ class ScoreEditService:
         self,
         *,
         draft_id: str,
-        author_id: str,
+        actor_id: str,
         command: DeleteBatchCommand,
     ) -> ScoreView:
-        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
         document: ScoreDocument = versioned.document
         try:
             requests: Sequence[MutationRequest] = self._compiler.compile_delete_batch(
@@ -103,7 +103,7 @@ class ScoreEditService:
             )
             self._run(document=document, requests=requests)
         except MutationRejectedError as error:
-            raise EditRejectedError(reason=error.reason) from error
+            raise ScoreEditRejectedError(reason=error.reason) from error
 
         await self._commit(versioned=versioned)
         return ScoreView(document=document)
@@ -112,46 +112,49 @@ class ScoreEditService:
         self,
         *,
         draft_id: str,
-        author_id: str,
+        actor_id: str,
     ) -> ScoreView:
         # An empty history is a successful no-op, not an error: the request was
         # understood and the draft is left in a valid state.
         # Return the current view either way
-        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
 
         try:
             await self._drafts_history.undo(draft=versioned)
-        except DraftNotFoundError as error:
-            raise EditDraftNotFoundError(draft_id=error.draft_id) from error
-        except DraftVersionClashError as error:
-            raise EditConflictError(draft_id=error.draft_id) from error
+        except DraftStoreNotFoundError as error:
+            raise DraftNotFoundError(draft_id=error.draft_id) from error
+        except DraftStoreVersionConflictError as error:
+            raise DraftVersionConflictError(
+                draft_id=error.draft_id, version=error.version
+            ) from error
 
-        current: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        current: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
         return ScoreView(document=current.document)
 
     async def redo(
         self,
         *,
         draft_id: str,
-        author_id: str,
+        actor_id: str,
     ) -> ScoreView:
-        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        versioned: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
 
         try:
             await self._drafts_history.redo(draft=versioned)
-        except DraftNotFoundError as error:
-            raise EditDraftNotFoundError(draft_id=error.draft_id) from error
-        except DraftVersionClashError as error:
-            raise EditConflictError(draft_id=error.draft_id) from error
+        except DraftStoreNotFoundError as error:
+            raise DraftNotFoundError(draft_id=error.draft_id) from error
+        except DraftStoreVersionConflictError as error:
+            raise DraftVersionConflictError(
+                draft_id=error.draft_id, version=error.version
+            ) from error
 
-        current: VersionedDraftDocument = await self._load(draft_id=draft_id)
+        current: VersionedDraftDocument = await self._load(draft_id=draft_id, actor_id=actor_id)
         return ScoreView(document=current.document)
 
-    async def _load(self, *, draft_id: str) -> VersionedDraftDocument:
-        try:
-            return await self._drafts_history.load(draft_id=draft_id)
-        except DraftNotFoundError as error:
-            raise EditDraftNotFoundError(draft_id=error.draft_id) from error
+    async def _load(self, *, draft_id: str, actor_id: str) -> VersionedDraftDocument:
+        return await require_accessible_draft(
+            storage=self._drafts_history, draft_id=draft_id, viewer_id=actor_id
+        )
 
     async def _commit(
         self,
@@ -160,10 +163,12 @@ class ScoreEditService:
     ) -> None:
         try:
             await self._drafts_history.commit(draft=versioned)
-        except DraftNotFoundError as error:
-            raise EditDraftNotFoundError(draft_id=error.draft_id) from error
-        except DraftVersionClashError as error:
-            raise EditConflictError(draft_id=error.draft_id) from error
+        except DraftStoreNotFoundError as error:
+            raise DraftNotFoundError(draft_id=error.draft_id) from error
+        except DraftStoreVersionConflictError as error:
+            raise DraftVersionConflictError(
+                draft_id=error.draft_id, version=error.version
+            ) from error
 
     # TODO consider moving commit here
     def _run(self, *, document: ScoreDocument, requests: Sequence[MutationRequest]) -> None:

@@ -19,12 +19,12 @@ def build_edit_router(*, service: ScoreEditService, current_user: CurrentUser) -
     @router.post(path="/notes", status_code=200)
     async def insert_note(
         draft_id: Annotated[str, Path(description="The draft ID")],
-        author_id: Annotated[str, Depends(current_user)],
+        actor_id: Annotated[str, Depends(current_user)],
         request: Annotated[InsertNoteRequest, Body(description="The insert command")],
     ) -> ScoreEditedResponse:
         view: ScoreView = await service.insert_note(
             draft_id=draft_id,
-            author_id=author_id,
+            actor_id=actor_id,
             command=request.to_command(),
         )
         return ScoreEditedResponse.from_view(view)
@@ -32,12 +32,12 @@ def build_edit_router(*, service: ScoreEditService, current_user: CurrentUser) -
     @router.post(path="/ties", status_code=200)
     async def tie_notes(
         draft_id: Annotated[str, Path(description="The draft ID")],
-        author_id: Annotated[str, Depends(current_user)],
+        actor_id: Annotated[str, Depends(current_user)],
         request: Annotated[TieNotesRequest, Body(description="The tie command")],
     ) -> ScoreEditedResponse:
         view: ScoreView = await service.tie_notes(
             draft_id=draft_id,
-            author_id=author_id,
+            actor_id=actor_id,
             command=request.to_command(),
         )
         return ScoreEditedResponse.from_view(view)
@@ -45,33 +45,33 @@ def build_edit_router(*, service: ScoreEditService, current_user: CurrentUser) -
     @router.post(path="/batch-delete", status_code=200)
     async def delete_batch(
         draft_id: Annotated[str, Path(description="The draft ID")],
-        author_id: Annotated[str, Depends(current_user)],
+        actor_id: Annotated[str, Depends(current_user)],
         request: Annotated[DeleteBatchRequest, Body(description="The delete command")],
     ) -> ScoreEditedResponse:
         view: ScoreView = await service.delete_batch(
-            draft_id=draft_id, author_id=author_id, command=request.to_command()
+            draft_id=draft_id, actor_id=actor_id, command=request.to_command()
         )
         return ScoreEditedResponse.from_view(view)
 
     @router.post(path="/undo", status_code=200)
     async def undo(
         draft_id: Annotated[str, Path(description="The draft ID")],
-        author_id: Annotated[str, Depends(current_user)],
+        actor_id: Annotated[str, Depends(current_user)],
     ) -> ScoreEditedResponse:
         view: ScoreView = await service.undo(
             draft_id=draft_id,
-            author_id=author_id,
+            actor_id=actor_id,
         )
         return ScoreEditedResponse.from_view(view)
 
     @router.post(path="/redo", status_code=200)
     async def redo(
         draft_id: Annotated[str, Path(description="The draft ID")],
-        author_id: Annotated[str, Depends(current_user)],
+        actor_id: Annotated[str, Depends(current_user)],
     ) -> ScoreEditedResponse:
         view: ScoreView = await service.redo(
             draft_id=draft_id,
-            author_id=author_id,
+            actor_id=actor_id,
         )
         return ScoreEditedResponse.from_view(view)
 

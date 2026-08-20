@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from piano_app.adapters.inbound.http import (
     CurrentUser,
     CurrentUserOptional,
+    build_authors_router,
     build_draft_router,
     build_edit_router,
     build_save_router,
@@ -20,11 +21,11 @@ from piano_app.adapters.inbound.http import (
 from piano_app.adapters.outbound.auth import JWTAccessTokenService
 from piano_app.adapters.outbound.google import GoogleIdentityVerifier
 from piano_app.adapters.outbound.in_memory.draft_history import InMemoryDraftHistory
-from piano_app.adapters.outbound.postgres.auth.uow import PostgresAuthUoWFactory
+from piano_app.adapters.outbound.postgres.draft import PostgresDraftArchive
 from piano_app.adapters.outbound.postgres.engine import create_engine as create_pg_engine
 from piano_app.adapters.outbound.postgres.engine import create_session_factory
-from piano_app.adapters.outbound.postgres.score.draft_archive import PostgresDraftArchive
-from piano_app.adapters.outbound.postgres.score.uow import PostgresScoreUoWFactory
+from piano_app.adapters.outbound.postgres.system.auth import PostgresAuthUoWFactory
+from piano_app.adapters.outbound.postgres.system.score import PostgresScoreUoWFactory
 from piano_app.adapters.outbound.redis.client import create_client as create_redis_client
 from piano_app.adapters.outbound.redis.draft_cache import RedisDraftCache
 from piano_app.adapters.outbound.redis.draft_history import RedisDraftHistory
@@ -50,7 +51,6 @@ from .settings import DraftHistoryBackend, Settings, load_settings
 def build_draft_history(
     *,
     settings: Settings,
-    session_factory: async_sessionmaker[AsyncSession] | None,
     codec: ScoreDocumentCodec,
     stack: AsyncExitStack,
 ) -> DraftHistory:
@@ -58,8 +58,8 @@ def build_draft_history(
     (in-memory by default), and registers ITS OWN cleanup on ``stack`` right here — the
     caller (``build_app``) never inspects the returned adapter's type or reaches for a
     connection it doesn't know about; each backend owns both its construction and its
-    teardown as one unit. ``session_factory`` is only used by TIERED (its Postgres cold
-    tier); MEMORY/REDIS ignore it. MEMORY registers nothing (no connection to close)."""
+    teardown as one unit. TIERED owns a dedicated Postgres engine for its cold archive;
+    it never receives the system database's session factory. MEMORY registers nothing."""
     match settings.DRAFT_HISTORY_BACKEND:
         case DraftHistoryBackend.MEMORY:
             return InMemoryDraftHistory()
@@ -70,15 +70,21 @@ def build_draft_history(
             stack.push_async_callback(history.aclose)
             return history
         case DraftHistoryBackend.TIERED:
-            assert session_factory is not None, (
-                "TIERED draft history needs a Postgres session_factory."
+            assert settings.DRAFT_DATABASE_URL is not None, (
+                "TIERED draft history needs DRAFT_DATABASE_URL set."
             )
             assert settings.REDIS_URL is not None, "TIERED draft history needs REDIS_URL set."
+            draft_engine: AsyncEngine = create_pg_engine(database_url=settings.DRAFT_DATABASE_URL)
+            stack.push_async_callback(draft_engine.dispose)
+            draft_session_factory: async_sessionmaker[AsyncSession] = create_session_factory(
+                engine=draft_engine
+            )
             cache: RedisDraftCache = RedisDraftCache(
                 client=create_redis_client(database_url=settings.REDIS_URL), codec=codec
             )
+            stack.push_async_callback(cache.aclose)
             archive: PostgresDraftArchive = PostgresDraftArchive(
-                session_factory=session_factory, codec=codec
+                session_factory=draft_session_factory, codec=codec
             )
             tiered: TieredDraftHistory = TieredDraftHistory(archive=archive, cache=cache)
             stack.push_async_callback(tiered.aclose)
@@ -86,12 +92,11 @@ def build_draft_history(
 
 
 def build_pg_engine(*, settings: Settings, stack: AsyncExitStack) -> AsyncEngine:
-    """The one Postgres engine for the whole app. Every Postgres-touching adapter
-    (``ScoreRepository``; ``PostgresDraftArchive`` when ``DRAFT_HISTORY_BACKEND=tiered``)
-    reuses this single connection pool instead of each opening its own — they're all
-    just adapters over the same database. Pure construction only — no connection is
-    opened until first use. Registers its own disposal on ``stack``, same as every
-    other resource-owning builder."""
+    """Constructs the system Postgres engine used by auth and canon-score storage.
+
+    The tiered draft backend owns a separate engine pointed at ``DRAFT_DATABASE_URL``.
+    Construction is lazy; disposal is registered on the application's exit stack.
+    """
     engine: AsyncEngine = create_pg_engine(database_url=settings.DATABASE_URL)
     stack.push_async_callback(engine.dispose)
     return engine
@@ -135,13 +140,13 @@ def build_app(*, settings: Settings | None = None) -> FastAPI:
         ),
         access_tokens=access_tokens,
     )
-    current_user: CurrentUser = CurrentUser(access_tokens=access_tokens)
-    current_user_optional: CurrentUserOptional = CurrentUserOptional(access_tokens=access_tokens)
+    current_user: CurrentUser = CurrentUser(service=auth_service)
+    current_user_optional: CurrentUserOptional = CurrentUserOptional(service=auth_service)
 
     engine: MutationEngine = build_engine()
     compiler: MutationCompiler = MutationCompiler()
     history: DraftHistory = build_draft_history(
-        settings=resolved_settings, session_factory=session_factory, codec=codec, stack=stack
+        settings=resolved_settings, codec=codec, stack=stack
     )
     edit_service: ScoreEditService = ScoreEditService(
         engine=engine, compiler=compiler, history=history
@@ -191,6 +196,7 @@ def build_app(*, settings: Settings | None = None) -> FastAPI:
             current_user_optional=current_user_optional,
         )
     )
+    app.include_router(build_authors_router(service=catalog_service))
     app.include_router(build_draft_router(service=draft_service, current_user=current_user))
     app.include_router(build_edit_router(service=edit_service, current_user=current_user))
     app.include_router(build_save_router(service=save_service, current_user=current_user))

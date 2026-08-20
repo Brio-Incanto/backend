@@ -8,11 +8,6 @@ class RotatedRefreshSession:
     credential: str
 
 
-class InvalidRefreshTokenError(Exception):
-    def __init__(self) -> None:
-        super().__init__("Refresh token is invalid or expired.")
-
-
 class RefreshSessionRepository(Protocol):
     async def create(self, *, user_id: str) -> str: ...
 
