@@ -1,17 +1,16 @@
-from .access_token_service import AccessToken, AccessTokenService, InvalidAccessTokenError
+from .access_token_service import AccessToken, AccessTokenService, AccessTokenVerificationError
 from .external_identity_verifier import (
+    ExternalCredentialVerificationError,
     ExternalIdentityVerifier,
-    InvalidExternalCredentialError,
     VerifiedIdentity,
 )
 from .identity_repository import (
-    IdentityAlreadyLinkedError,
+    IdentityLinkConflictError,
     IdentityRepository,
-    UsernameConflictError,
+    UsernameAlreadyExistsError,
     UserProfile,
 )
 from .refresh_session_repository import (
-    InvalidRefreshTokenError,
     RefreshSessionRepository,
     RotatedRefreshSession,
 )
@@ -20,17 +19,16 @@ from .uow import AuthUow, AuthUoWFactory
 __all__ = (
     "AccessToken",
     "AccessTokenService",
+    "AccessTokenVerificationError",
     "AuthUoWFactory",
     "AuthUow",
+    "ExternalCredentialVerificationError",
     "ExternalIdentityVerifier",
-    "IdentityAlreadyLinkedError",
+    "IdentityLinkConflictError",
     "IdentityRepository",
-    "InvalidAccessTokenError",
-    "InvalidExternalCredentialError",
-    "InvalidRefreshTokenError",
     "RefreshSessionRepository",
     "RotatedRefreshSession",
     "UserProfile",
-    "UsernameConflictError",
+    "UsernameAlreadyExistsError",
     "VerifiedIdentity",
 )

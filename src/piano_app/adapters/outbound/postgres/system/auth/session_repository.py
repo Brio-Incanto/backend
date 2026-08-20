@@ -8,9 +8,8 @@ from sqlalchemy import ScalarResult, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.dml import Delete, ReturningUpdate
 
-from piano_app.adapters.outbound.postgres.schema import AuthSessionORM
+from piano_app.adapters.outbound.postgres.system.schema import AuthSessionORM
 from piano_app.application.ports.auth.refresh_session_repository import (
-    InvalidRefreshTokenError,
     RotatedRefreshSession,
 )
 
@@ -39,7 +38,7 @@ class _RefreshCredential:
         secret: str
         session_id, separator, secret = credential.partition(".")
         if not session_id or not separator or not secret:
-            raise InvalidRefreshTokenError
+            raise ValueError("Malformed refresh credential.")
 
         return cls(_session_id=session_id, _secret=secret)
 
@@ -76,7 +75,7 @@ class PostgresRefreshSessionRepository:
     async def rotate(self, *, credential: str) -> RotatedRefreshSession | None:
         try:
             old_credential: _RefreshCredential = _RefreshCredential.parse(credential=credential)
-        except InvalidRefreshTokenError:
+        except ValueError:
             # malformed, same as "not found" for the caller — not this port's
             # own error escaping unhandled past the adapter
             return None
@@ -113,7 +112,7 @@ class PostgresRefreshSessionRepository:
     async def revoke(self, *, credential: str) -> None:
         try:
             cred: _RefreshCredential = _RefreshCredential.parse(credential=credential)
-        except InvalidRefreshTokenError:
+        except ValueError:
             return
 
         statement: Delete = delete(AuthSessionORM).where(

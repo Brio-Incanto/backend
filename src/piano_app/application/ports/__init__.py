@@ -1,4 +1,4 @@
-from piano_app.application.ports.shared.pagination import InvalidCursorError, Page
+from piano_app.application.ports.shared.pagination import Page, PaginationCursorDecodingError
 from piano_app.domain.score import Score
 
 from .score import (
@@ -18,8 +18,8 @@ __all__ = (
     "AuthorRepository",
     "DraftHistory",
     "DraftStore",
-    "InvalidCursorError",
     "Page",
+    "PaginationCursorDecodingError",
     "Score",
     "ScoreCatalogQuery",
     "ScoreMetaItem",

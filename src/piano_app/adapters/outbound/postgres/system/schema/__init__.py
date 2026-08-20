@@ -1,13 +1,12 @@
 from .auth import AuthSessionORM, UserIdentityORM
 from .base import Base, metadata
-from .core import CollectionORM, ScoreContentORM, ScoreMetaORM, UserORM
-from .draft import DraftORM
+from .core import CollectionORM, CollectionScoreORM, ScoreContentORM, ScoreMetaORM, UserORM
 
 __all__ = (
     "AuthSessionORM",
     "Base",
     "CollectionORM",
-    "DraftORM",
+    "CollectionScoreORM",
     "ScoreContentORM",
     "ScoreMetaORM",
     "UserIdentityORM",

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import jwt
 
-from piano_app.application.ports.auth import AccessToken, InvalidAccessTokenError
+from piano_app.application.ports.auth import AccessToken, AccessTokenVerificationError
 
 
 class JWTAccessTokenService:
@@ -59,11 +59,11 @@ class JWTAccessTokenService:
                 audience=self._audience,
             )
         except jwt.InvalidTokenError:
-            raise InvalidAccessTokenError from None
+            raise AccessTokenVerificationError from None
 
         # check for a correct subject
         subject: object = claims.get("sub")
         if not isinstance(subject, str) or not subject:
-            raise InvalidAccessTokenError
+            raise AccessTokenVerificationError
 
         return subject

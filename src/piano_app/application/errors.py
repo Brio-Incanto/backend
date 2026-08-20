@@ -1,28 +1,29 @@
-class EditDraftNotFoundError(Exception):
-    """Raised when an edit targets a draft id that has no working copy."""
+class DraftNotFoundError(Exception):
+    """Raised when a requested draft has no working copy."""
 
     def __init__(self, *, draft_id: str) -> None:
         super().__init__(f"No draft with id {draft_id!r}.")
         self.draft_id: str = draft_id
 
 
-class EditConflictError(Exception):
-    """Raised when a draft changes while an edit is being applied."""
+class DraftVersionConflictError(Exception):
+    """Raised when an operation is based on an outdated draft version."""
 
-    def __init__(self, *, draft_id: str) -> None:
+    def __init__(self, *, draft_id: str, version: int | None) -> None:
         super().__init__(f"Draft {draft_id!r} changed while the edit was being applied.")
         self.draft_id: str = draft_id
+        self.version: int | None = version
 
 
-class EditRejectedError(Exception):
-    """Raised when an edit is rejected in the mutation engine."""
+class ScoreEditRejectedError(Exception):
+    """Raised when a score edit is rejected by the domain."""
 
     def __init__(self, *, reason: str) -> None:
         super().__init__(reason)
         self.reason: str = reason
 
 
-class MissingScoreError(Exception):
+class ScoreNotFoundError(Exception):
     """Raised when a canon score can't be found — missing or not visible to
     the caller, always the same error."""
 
@@ -31,7 +32,7 @@ class MissingScoreError(Exception):
         self.score_id: str | None = score_id
 
 
-class ScoreVersionClashError(Exception):
+class ScoreVersionConflictError(Exception):
     """Raised when a concurrent write to the same score already took the
     version this write was trying to append."""
 
@@ -92,7 +93,7 @@ class InvalidAccessTokenError(Exception):
         super().__init__("Access token is invalid or expired.")
 
 
-class InvalidCursorError(Exception):
+class InvalidPaginationCursorError(Exception):
     """Raised when a client-supplied pagination cursor can't be decoded."""
 
     def __init__(self) -> None:

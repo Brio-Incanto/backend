@@ -2,11 +2,11 @@ from sqlalchemy import ScalarResult, Select, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from piano_app.adapters.outbound.postgres.schema import UserIdentityORM, UserORM
+from piano_app.adapters.outbound.postgres.system.schema import UserIdentityORM, UserORM
 from piano_app.application.ports.auth.external_identity_verifier import VerifiedIdentity
 from piano_app.application.ports.auth.identity_repository import (
-    IdentityAlreadyLinkedError,
-    UsernameConflictError,
+    IdentityLinkConflictError,
+    UsernameAlreadyExistsError,
     UserProfile,
 )
 
@@ -25,7 +25,7 @@ class PostgresIdentityRepository:
         try:
             await self._session.flush()
         except IntegrityError as error:
-            raise UsernameConflictError(username=username) from error
+            raise UsernameAlreadyExistsError(username=username) from error
 
         return UserProfile(user_id=user.id, username=user.username)
 
@@ -39,7 +39,7 @@ class PostgresIdentityRepository:
         try:
             await self._session.flush()
         except IntegrityError as error:
-            raise IdentityAlreadyLinkedError from error
+            raise IdentityLinkConflictError from error
 
     async def find_user_id(self, *, identity: VerifiedIdentity) -> str | None:
         statement: Select[tuple[str]] = select(UserIdentityORM.user_id).where(

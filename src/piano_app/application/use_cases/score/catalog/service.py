@@ -1,17 +1,15 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from piano_app.application.errors import InvalidCursorError as AppInvalidCursorError
-from piano_app.application.errors import MissingScoreError
+from piano_app.application.errors import InvalidPaginationCursorError
 from piano_app.application.ports import (
     AuthorProfile,
-    InvalidCursorError,
     Page,
+    PaginationCursorDecodingError,
     ScoreMetaItem,
     ScoreUoWFactory,
 )
-from piano_app.application.use_cases.score.shared import ScoreView
+from piano_app.application.use_cases.score.shared import ScoreView, require_readable_score
 from piano_app.domain.score import Score
 
 
@@ -46,8 +44,8 @@ class ScoreCatalogService:
         async with self._score_uow_factory() as uow:
             try:
                 return await uow.catalog_query.search(query=query, limit=limit, cursor=cursor)
-            except InvalidCursorError as error:
-                raise AppInvalidCursorError from error
+            except PaginationCursorDecodingError as error:
+                raise InvalidPaginationCursorError from error
 
     async def search_mine(
         self,
@@ -62,32 +60,55 @@ class ScoreCatalogService:
                 return await uow.catalog_query.search_mine(
                     viewer_id=viewer_id, query=query, limit=limit, cursor=cursor
                 )
-            except InvalidCursorError as error:
-                raise AppInvalidCursorError from error
+            except PaginationCursorDecodingError as error:
+                raise InvalidPaginationCursorError from error
+
+    async def search_author_scores(
+        self,
+        *,
+        author_id: str,
+        query: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> Page[ScoreMetaItem]:
+        async with self._score_uow_factory() as uow:
+            try:
+                return await uow.catalog_query.search_author_scores(
+                    author_id=author_id, query=query, limit=limit, cursor=cursor
+                )
+            except PaginationCursorDecodingError as error:
+                raise InvalidPaginationCursorError from error
 
     async def get_score_branches(
-        self, *, score_id: str, viewer_id: str | None
-    ) -> Sequence[ScoreMetaItem]:
+        self,
+        *,
+        score_id: str,
+        viewer_id: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> Page[ScoreMetaItem]:
         async with self._score_uow_factory() as uow:
-            return await uow.catalog_query.get_score_branches(
-                score_id=score_id, viewer_id=viewer_id
-            )
+            try:
+                return await uow.catalog_query.get_score_branches(
+                    score_id=score_id, viewer_id=viewer_id, limit=limit, cursor=cursor
+                )
+            except PaginationCursorDecodingError as error:
+                raise InvalidPaginationCursorError from error
 
+    # TODO check relation permission if score with no author
     async def get_score(self, *, score_id: str, viewer_id: str | None) -> ScoreItem:
         async with self._score_uow_factory() as uow:
-            score: Score | None = await uow.score_repository.get(
-                score_id=score_id, viewer_id=viewer_id
+            score: Score = await require_readable_score(
+                score_repository=uow.score_repository,
+                score_id=score_id,
+                viewer_id=viewer_id,
             )
-            if score is None:
-                raise MissingScoreError(score_id=score_id)
 
             author_name: str | None = None
             if score.author_id is not None:
                 author: AuthorProfile | None = await uow.author_repository.get(
                     author_id=score.author_id
                 )
-                # a missing author (deleted account) just means no name to show —
-                # not a reason to fail the whole score fetch
                 author_name = author.username if author is not None else None
 
             return ScoreItem(

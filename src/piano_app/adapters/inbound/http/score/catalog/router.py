@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
@@ -47,20 +46,20 @@ def build_scores_router(
         )
         return PageResponse.of(page, item=ScoreCardResponse.from_item)
 
-    # Not paginated: a score's branch count is expected to stay small (organic
-    # forks by other users), unlike the global catalog — revisit if that stops
-    # holding. No tree here either — this is one flat level (direct children of
-    # score_id), not a recursive derivation graph; nothing upstream needs deeper
-    # branch nesting yet.
     @router.get(path="/{score_id}/branches", status_code=200)
     async def get_score_branches(
         score_id: Annotated[str, Path(description="The score ID")],
         viewer_id: Annotated[str | None, Depends(current_user_optional)],
-    ) -> Sequence[ScoreCardResponse]:
-        items: Sequence[ScoreMetaItem] = await service.get_score_branches(
-            score_id=score_id, viewer_id=viewer_id
+        limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+        cursor: Annotated[
+            str | None,
+            Query(description="Opaque page cursor from a previous page's next_cursor"),
+        ] = None,
+    ) -> PageResponse[ScoreCardResponse]:
+        page: Page[ScoreMetaItem] = await service.get_score_branches(
+            score_id=score_id, viewer_id=viewer_id, limit=limit, cursor=cursor
         )
-        return [ScoreCardResponse.from_item(item) for item in items]
+        return PageResponse.of(page, item=ScoreCardResponse.from_item)
 
     @router.get(path="/{score_id}", status_code=200)
     async def get_score(

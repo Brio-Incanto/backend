@@ -2,11 +2,14 @@ import asyncio
 from collections.abc import Mapping
 from typing import Any
 
-from google.auth.exceptions import GoogleAuthError
+from google.auth.exceptions import GoogleAuthError, TransportError
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
 
-from piano_app.application.ports.auth import InvalidExternalCredentialError, VerifiedIdentity
+from piano_app.application.ports.auth import (
+    ExternalCredentialVerificationError,
+    VerifiedIdentity,
+)
 
 
 class GoogleIdentityVerifier:
@@ -28,12 +31,14 @@ class GoogleIdentityVerifier:
                 request=Request(),
                 audience=list(self._allowed_audiences),
             )
+        except TransportError:
+            raise
         except GoogleAuthError, ValueError:
-            raise InvalidExternalCredentialError from None
+            raise ExternalCredentialVerificationError from None
 
         subject: object = claims.get("sub")
         if not isinstance(subject, str) or not subject:
-            raise InvalidExternalCredentialError
+            raise ExternalCredentialVerificationError
 
         return VerifiedIdentity(
             authority=self._AUTHORITY,

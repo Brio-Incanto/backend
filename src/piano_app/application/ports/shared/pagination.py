@@ -11,8 +11,5 @@ class Page[T]:
     next_cursor: str | None
 
 
-class InvalidCursorError(Exception):
-    """Raised when a client-supplied pagination cursor cannot be decoded."""
-
-    def __init__(self) -> None:
-        super().__init__("Pagination cursor is invalid.")
+class PaginationCursorDecodingError(Exception):
+    """Raised when an opaque pagination cursor cannot be decoded."""

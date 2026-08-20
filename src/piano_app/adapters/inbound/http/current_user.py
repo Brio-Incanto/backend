@@ -3,9 +3,7 @@ from typing import Annotated
 from fastapi import Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from piano_app.application.errors import InvalidAccessTokenError
-from piano_app.application.ports.auth import AccessTokenService
-from piano_app.application.ports.auth import InvalidAccessTokenError as PortInvalidAccessTokenError
+from piano_app.application.use_cases.auth import AuthService
 
 _BEARER: HTTPBearer = HTTPBearer(auto_error=False)
 
@@ -15,8 +13,8 @@ class CurrentUser:
     raises 401 if the bearer token is missing or invalid.
     """
 
-    def __init__(self, *, access_tokens: AccessTokenService) -> None:
-        self._access_tokens: AccessTokenService = access_tokens
+    def __init__(self, *, service: AuthService) -> None:
+        self._service: AuthService = service
 
     async def __call__(
         self,
@@ -26,16 +24,8 @@ class CurrentUser:
         ],
     ) -> str:
         # HTTPBearer(auto_error=False) returns None for a missing or non-"bearer"
-        # header; verify() raises the port's InvalidAccessTokenError for an
-        # invalid token — translated below, this dependency never lets that
-        # port-owned type cross into the HTTP layer.
-        if credentials is None:
-            raise InvalidAccessTokenError
-
-        try:
-            return self._access_tokens.verify(token=credentials.credentials)
-        except PortInvalidAccessTokenError as error:
-            raise InvalidAccessTokenError from error
+        token: str | None = None if credentials is None else credentials.credentials
+        return self._service.authenticate_access_token(token=token)
 
 
 class CurrentUserOptional:
@@ -44,8 +34,8 @@ class CurrentUserOptional:
     unreadable token is a client error, not anonymity. For endpoints that work
     anonymously but widen/annotate when the caller is known."""
 
-    def __init__(self, *, access_tokens: AccessTokenService) -> None:
-        self._access_tokens: AccessTokenService = access_tokens
+    def __init__(self, *, service: AuthService) -> None:
+        self._service: AuthService = service
 
     async def __call__(
         self,
@@ -57,7 +47,4 @@ class CurrentUserOptional:
         if credentials is None:
             return None
 
-        try:
-            return self._access_tokens.verify(token=credentials.credentials)
-        except PortInvalidAccessTokenError as error:
-            raise InvalidAccessTokenError from error
+        return self._service.authenticate_access_token(token=credentials.credentials)

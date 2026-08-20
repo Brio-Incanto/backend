@@ -17,7 +17,9 @@ def build_manage_router(*, current_user: CurrentUser) -> APIRouter:
     @router.patch(path="", status_code=200)
     async def change_visibility(
         score_id: Annotated[str, Path(description="The score ID")],
-        viewer_id: Annotated[str, Depends(current_user)],
+        actor_id: Annotated[str, Depends(current_user)],
         request: ChangeVisibilityRequest,
     ) -> None:
-        pass
+        raise NotImplementedError
+
+    return router
