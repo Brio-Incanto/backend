@@ -2,13 +2,9 @@ from piano_app.domain.score.document.models.material import CarrierOwner, Note
 from piano_app.domain.score.document.models.relations import Tie
 from piano_app.domain.score.document.models.structural import Voice
 from piano_app.domain.score.document.models.structural.rhythm import LeafRhythmicContainer
-from piano_app.domain.score.document.services.helpers import (
-    Interval,
-    interval_in_parent_scope,
-    iter_leaves,
-    translate_to_root,
-    voice_of,
-)
+from piano_app.domain.score.document.services.geometry import Span
+from piano_app.domain.score.document.services.geometry.score_geometry import ScoreGeometry
+from piano_app.domain.score.document.services.helpers import iter_leaves, voice_of
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import MutationRejectedError
@@ -78,13 +74,10 @@ class CreateTieAnalyzer:
             raise MutationRejectedError("Ties are allowed only between adjacent notes.")
 
         # prevent cases if there is a gap between the two notes
-        start_interval: Interval = translate_to_root(
-            interval=interval_in_parent_scope(container=start_leaf)
-        )
-        end_interval: Interval = translate_to_root(
-            interval=interval_in_parent_scope(container=end_leaf)
-        )
-        if start_interval.end != end_interval.start:
+        geometry: ScoreGeometry = ScoreGeometry(origin=start_leaf.anchor.measure)
+        start_span: Span = geometry.global_span_of(container=start_leaf)
+        end_span: Span = geometry.global_span_of(container=end_leaf)
+        if start_span.end != end_span.start:
             raise MutationRejectedError("Tied notes must touch on the voice timeline.")
 
         buffer.incorporate(

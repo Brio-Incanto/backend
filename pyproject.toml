@@ -19,6 +19,7 @@ dependencies = [
     "alembic>=1.14",
     "google-auth[requests]>=2.40",
     "PyJWT>=2.10",
+    "python-dotenv>=1.2",
 ]
 
 [project.optional-dependencies]
@@ -71,12 +72,12 @@ warn_unused_ignores = true
 warn_unreachable = true
 strict_equality = true
 
-[tool.pytest]
+[tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
-python-files = ["test_*.py"]
+python_files = ["test_*.py"]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
-asyncio-mode = "auto"
+asyncio_mode = "auto"
 markers = [
     "unit: fast isolated tests",
     "integration: tests that touch external systems",

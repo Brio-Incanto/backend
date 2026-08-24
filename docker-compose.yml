@@ -1,0 +1,68 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override the connection settings to the in-network service names —
+      # .env's values are for host-side (non-Docker) local dev and point at
+      # localhost, which is not reachable from inside this compose network.
+      DRAFT_HISTORY_BACKEND: tiered
+      DATABASE_URL: postgresql+asyncpg://piano:piano@postgres:5432/piano
+      DRAFT_DATABASE_URL: postgresql+asyncpg://piano_drafts:piano_drafts@draft-postgres:5432/piano_drafts
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      draft-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: piano
+      POSTGRES_PASSWORD: piano
+      POSTGRES_DB: piano
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U piano -d piano"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  draft-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: piano_drafts
+      POSTGRES_PASSWORD: piano_drafts
+      POSTGRES_DB: piano_drafts
+    ports:
+      - "5433:5432"
+    volumes:
+      - draft-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U piano_drafts -d piano_drafts"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres-data:
+  draft-postgres-data:

@@ -1,9 +1,9 @@
 from .archive import PostgresDraftArchive
-from .schema import DraftContentORM, DraftMetaORM, draft_metadata
+from .schema import DraftContentModel, DraftMetaModel, draft_metadata
 
 __all__ = (
-    "DraftContentORM",
-    "DraftMetaORM",
+    "DraftContentModel",
+    "DraftMetaModel",
     "PostgresDraftArchive",
     "draft_metadata",
 )

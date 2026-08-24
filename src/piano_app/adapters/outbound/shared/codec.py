@@ -3,7 +3,7 @@ from fractions import Fraction
 from typing import Any
 
 from piano_app.domain.score.document.models import ScoreDocument, ScoreEntity
-from piano_app.domain.score.document.models.context.placements import ContextPlacement
+from piano_app.domain.score.document.models.context import Context
 from piano_app.domain.score.document.models.material import (
     Carrier,
     CarrierOwner,
@@ -55,7 +55,7 @@ class _Serializer:
         self._carriers: dict[str, Carrier] = {}
         self._items: dict[str, MusicalItem] = {}
         self._relations: dict[str, Relation] = {}
-        self._contexts: list[ContextPlacement] = []  # TODO
+        self._contexts: list[Context] = []  # TODO
 
         self._collect(document=document)
 

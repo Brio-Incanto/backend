@@ -6,6 +6,8 @@ from piano_app.domain.score.document.models.base import ScoreEntity
 from piano_app.domain.score.document.models.mutation_sink import DIRECT_SINK, MutationSink
 
 if TYPE_CHECKING:
+    from piano_app.domain.score.document.models.context.point.voices import VoicesPointContext
+    from piano_app.domain.score.document.models.context.span.voices import VoicesSpanContext
     from piano_app.domain.score.document.models.structural.rhythm.metric import (
         RhythmicContainer,
     )
@@ -15,11 +17,18 @@ if TYPE_CHECKING:
 class Voice(ScoreEntity):
     # may be empty at any time
     _children: list[RhythmicContainer] = field(default_factory=list)
+    # many-to-many with contexts: a context can name several voices, and one voice
+    # can be named by several contexts over time
+    _contexts: list[VoicesPointContext | VoicesSpanContext] = field(default_factory=list)
 
     # no constraint on emptiness in voice
     @property
     def children(self) -> Sequence[RhythmicContainer]:
         return self._children
+
+    @property
+    def contexts(self) -> Sequence[VoicesPointContext | VoicesSpanContext]:
+        return self._contexts
 
     def add_child(
         self,
@@ -53,3 +62,31 @@ class Voice(ScoreEntity):
             return
 
         sink.list_remove(self._children, child)
+
+    def add_context(
+        self,
+        *,
+        context: VoicesPointContext | VoicesSpanContext,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None:
+        if self not in context.voices:
+            raise ValueError("Cannot add context that does not name this voice.")
+
+        if context in self._contexts:
+            return
+
+        sink.list_append(self._contexts, context)
+
+    def remove_context(
+        self,
+        *,
+        context: VoicesPointContext | VoicesSpanContext,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None:
+        if self not in context.voices:
+            raise ValueError("Cannot remove context that does not name this voice.")
+
+        if context not in self._contexts:
+            return
+
+        sink.list_remove(self._contexts, context)

@@ -1,15 +1,21 @@
-from .auth import AuthSessionORM, UserIdentityORM
+from .auth import AuthSessionModel, UserIdentityModel
 from .base import Base, metadata
-from .core import CollectionORM, CollectionScoreORM, ScoreContentORM, ScoreMetaORM, UserORM
+from .core import (
+    CollectionModel,
+    CollectionScoreModel,
+    ScoreContentModel,
+    ScoreMetaModel,
+    UserModel,
+)
 
 __all__ = (
-    "AuthSessionORM",
+    "AuthSessionModel",
     "Base",
-    "CollectionORM",
-    "CollectionScoreORM",
-    "ScoreContentORM",
-    "ScoreMetaORM",
-    "UserIdentityORM",
-    "UserORM",
+    "CollectionModel",
+    "CollectionScoreModel",
+    "ScoreContentModel",
+    "ScoreMetaModel",
+    "UserIdentityModel",
+    "UserModel",
     "metadata",
 )

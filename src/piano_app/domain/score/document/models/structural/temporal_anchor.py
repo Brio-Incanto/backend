@@ -7,10 +7,7 @@ from piano_app.domain.score.document.models.base import ScoreEntity
 from piano_app.domain.score.document.models.mutation_sink import DIRECT_SINK, MutationSink
 
 if TYPE_CHECKING:
-    from piano_app.domain.score.document.models.context.placements import (
-        ContextPlacement,
-        SpanContextPlacement,
-    )
+    from piano_app.domain.score.document.models.context import Context, SpanContext
     from piano_app.domain.score.document.models.structural.measure import Measure
     from piano_app.domain.score.document.models.structural.rhythm.metric import (
         LeafRhythmicContainer,
@@ -46,8 +43,8 @@ class TemporalAnchor(ScoreEntity):
 
     _leaf_containers: list[LeafRhythmicContainer] = field(default_factory=list)
 
-    _starting_contexts: list[ContextPlacement] = field(default_factory=list)
-    _ending_contexts: list[SpanContextPlacement] = field(default_factory=list)
+    _starting_contexts: list[Context] = field(default_factory=list)
+    _ending_contexts: list[SpanContext] = field(default_factory=list)
 
     @property
     def measure(self) -> Measure:
@@ -58,11 +55,11 @@ class TemporalAnchor(ScoreEntity):
         return self._leaf_containers
 
     @property
-    def starting_contexts(self) -> Sequence[ContextPlacement]:
+    def starting_contexts(self) -> Sequence[Context]:
         return self._starting_contexts
 
     @property
-    def ending_contexts(self) -> Sequence[SpanContextPlacement]:
+    def ending_contexts(self) -> Sequence[SpanContext]:
         return self._ending_contexts
 
     @property
@@ -165,3 +162,59 @@ class TemporalAnchor(ScoreEntity):
             return
 
         sink.list_remove(self._leaf_containers, leaf_container)
+
+    def add_starting_context(
+        self,
+        *,
+        context: Context,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None:
+        if context.start is not self:
+            raise ValueError("Cannot add context that does not start at this anchor.")
+
+        if context in self._starting_contexts:
+            return
+
+        sink.list_append(self._starting_contexts, context)
+
+    def remove_starting_context(
+        self,
+        *,
+        context: Context,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None:
+        if context.start is not self:
+            raise ValueError("Cannot remove context that does not start at this anchor.")
+
+        if context not in self._starting_contexts:
+            return
+
+        sink.list_remove(self._starting_contexts, context)
+
+    def add_ending_context(
+        self,
+        *,
+        context: SpanContext,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None:
+        if context.end is not self:
+            raise ValueError("Cannot add context that does not end at this anchor.")
+
+        if context in self._ending_contexts:
+            return
+
+        sink.list_append(self._ending_contexts, context)
+
+    def remove_ending_context(
+        self,
+        *,
+        context: SpanContext,
+        sink: MutationSink = DIRECT_SINK,
+    ) -> None:
+        if context.end is not self:
+            raise ValueError("Cannot remove context that does not end at this anchor.")
+
+        if context not in self._ending_contexts:
+            return
+
+        sink.list_remove(self._ending_contexts, context)

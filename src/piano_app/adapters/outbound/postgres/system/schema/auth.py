@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base
 
 
-class UserIdentityORM(Base):
+class UserIdentityModel(Base):
     __tablename__ = "user_identities"
 
     authority: Mapped[str] = mapped_column(
@@ -24,7 +24,7 @@ class UserIdentityORM(Base):
     )
 
 
-class AuthSessionORM(Base):
+class AuthSessionModel(Base):
     __tablename__ = "auth_sessions"
 
     id: Mapped[str] = mapped_column(

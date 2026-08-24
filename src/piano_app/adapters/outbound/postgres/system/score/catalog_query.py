@@ -5,7 +5,7 @@ from typing import Final
 from sqlalchemy import Result, Row, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from piano_app.adapters.outbound.postgres.system.schema import ScoreMetaORM, UserORM
+from piano_app.adapters.outbound.postgres.system.schema import ScoreMetaModel, UserModel
 from piano_app.application.ports.score.catalog_query import ScoreMetaItem
 from piano_app.application.ports.shared.pagination import Page
 
@@ -14,8 +14,8 @@ from .helpers.search import matches
 from .helpers.visibility import is_authored_by, is_discoverable, is_readable_by
 
 _NEWEST: Final[CursorOrdering[datetime]] = CursorOrdering.create(
-    criterion=ScoreMetaORM.created_at,
-    identity=ScoreMetaORM.id,
+    criterion=ScoreMetaModel.created_at,
+    identity=ScoreMetaModel.id,
     descending=True,
     serialize=datetime.isoformat,
     deserialize=datetime.fromisoformat,
@@ -41,13 +41,13 @@ class PostgresScoreCatalogQuery:
         # discoverable only, no viewer widening
         cursor_ordering: CursorOrdering[datetime] = _NEWEST
 
-        statement: Select[tuple[ScoreMetaORM, str, datetime, str]] = (
+        statement: Select[tuple[ScoreMetaModel, str, datetime, str]] = (
             select(
-                ScoreMetaORM,
-                UserORM.username,
+                ScoreMetaModel,
+                UserModel.username,
                 *cursor_ordering.columns(),
             )
-            .join(UserORM, ScoreMetaORM.author_id == UserORM.id)
+            .join(UserModel, ScoreMetaModel.author_id == UserModel.id)
             .where(
                 is_discoverable(),
                 matches(query=query),
@@ -56,11 +56,11 @@ class PostgresScoreCatalogQuery:
             .order_by(*cursor_ordering.clauses())
             .limit(limit + 1)
         )
-        result: Result[tuple[ScoreMetaORM, str, datetime, str]] = await self._session.execute(
+        result: Result[tuple[ScoreMetaModel, str, datetime, str]] = await self._session.execute(
             statement
         )
-        rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = result.all()
-        page_rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = rows[:limit]
+        rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = result.all()
+        page_rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = rows[:limit]
 
         next_cursor: str | None = None
         if len(rows) > limit:
@@ -85,13 +85,13 @@ class PostgresScoreCatalogQuery:
     ) -> Page[ScoreMetaItem]:
         cursor_ordering: CursorOrdering[datetime] = _NEWEST
 
-        statement: Select[tuple[ScoreMetaORM, str, datetime, str]] = (
+        statement: Select[tuple[ScoreMetaModel, str, datetime, str]] = (
             select(
-                ScoreMetaORM,
-                UserORM.username,
+                ScoreMetaModel,
+                UserModel.username,
                 *cursor_ordering.columns(),
             )
-            .join(UserORM, ScoreMetaORM.author_id == UserORM.id)
+            .join(UserModel, ScoreMetaModel.author_id == UserModel.id)
             .where(
                 is_authored_by(author_id=viewer_id),
                 matches(query=query),
@@ -100,11 +100,11 @@ class PostgresScoreCatalogQuery:
             .order_by(*cursor_ordering.clauses())
             .limit(limit + 1)
         )
-        result: Result[tuple[ScoreMetaORM, str, datetime, str]] = await self._session.execute(
+        result: Result[tuple[ScoreMetaModel, str, datetime, str]] = await self._session.execute(
             statement
         )
-        rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = result.all()
-        page_rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = rows[:limit]
+        rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = result.all()
+        page_rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = rows[:limit]
 
         next_cursor: str | None = None
         if len(rows) > limit:
@@ -128,13 +128,13 @@ class PostgresScoreCatalogQuery:
     ) -> Page[ScoreMetaItem]:
         cursor_ordering: CursorOrdering[datetime] = _NEWEST
 
-        statement: Select[tuple[ScoreMetaORM, str, datetime, str]] = (
+        statement: Select[tuple[ScoreMetaModel, str, datetime, str]] = (
             select(
-                ScoreMetaORM,
-                UserORM.username,
+                ScoreMetaModel,
+                UserModel.username,
                 *cursor_ordering.columns(),
             )
-            .join(UserORM, ScoreMetaORM.author_id == UserORM.id)
+            .join(UserModel, ScoreMetaModel.author_id == UserModel.id)
             .where(
                 is_authored_by(author_id=author_id),
                 is_discoverable(),  # author is not none check is excessive
@@ -144,11 +144,11 @@ class PostgresScoreCatalogQuery:
             .order_by(*cursor_ordering.clauses())
             .limit(limit + 1)
         )
-        result: Result[tuple[ScoreMetaORM, str, datetime, str]] = await self._session.execute(
+        result: Result[tuple[ScoreMetaModel, str, datetime, str]] = await self._session.execute(
             statement
         )
-        rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = result.all()
-        page_rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = rows[:limit]
+        rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = result.all()
+        page_rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = rows[:limit]
 
         next_cursor: str | None = None
         if len(rows) > limit:
@@ -172,24 +172,24 @@ class PostgresScoreCatalogQuery:
     ) -> Page[ScoreMetaItem]:
         cursor_ordering: CursorOrdering[datetime] = _NEWEST
 
-        statement: Select[tuple[ScoreMetaORM, str, datetime, str]] = (
+        statement: Select[tuple[ScoreMetaModel, str, datetime, str]] = (
             select(
-                ScoreMetaORM,
-                UserORM.username,
+                ScoreMetaModel,
+                UserModel.username,
                 *cursor_ordering.columns(),
             )
-            .join(UserORM, ScoreMetaORM.author_id == UserORM.id)
+            .join(UserModel, ScoreMetaModel.author_id == UserModel.id)
             .where(
-                ScoreMetaORM.derived_from_id == score_id,
+                ScoreMetaModel.derived_from_id == score_id,
                 is_readable_by(viewer_id=viewer_id),
                 cursor_ordering.bounds(cursor=cursor),
             )
         )
-        result: Result[tuple[ScoreMetaORM, str, datetime, str]] = await self._session.execute(
+        result: Result[tuple[ScoreMetaModel, str, datetime, str]] = await self._session.execute(
             statement
         )
-        rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = result.all()
-        page_rows: Sequence[Row[tuple[ScoreMetaORM, str, datetime, str]]] = rows[:limit]
+        rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = result.all()
+        page_rows: Sequence[Row[tuple[ScoreMetaModel, str, datetime, str]]] = rows[:limit]
 
         next_cursor: str | None = None
         if len(rows) > limit:
@@ -204,7 +204,7 @@ class PostgresScoreCatalogQuery:
         )
 
     @staticmethod
-    def _to_item(*, score: ScoreMetaORM, author_name: str | None) -> ScoreMetaItem:
+    def _to_item(*, score: ScoreMetaModel, author_name: str | None) -> ScoreMetaItem:
         return ScoreMetaItem(
             id=score.id,
             title=score.title,

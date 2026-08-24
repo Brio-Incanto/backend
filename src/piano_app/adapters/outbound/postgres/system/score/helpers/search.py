@@ -3,7 +3,7 @@ so replacing ILIKE with full-text search is rewriting this function and nothing 
 
 from sqlalchemy import ColumnElement, or_, true
 
-from piano_app.adapters.outbound.postgres.system.schema import ScoreMetaORM
+from piano_app.adapters.outbound.postgres.system.schema import ScoreMetaModel
 
 
 def matches(*, query: str | None) -> ColumnElement[bool]:
@@ -14,6 +14,6 @@ def matches(*, query: str | None) -> ColumnElement[bool]:
     pattern: str = f"%{query}%"
 
     return or_(
-        ScoreMetaORM.title.ilike(pattern),
-        ScoreMetaORM.composer.ilike(pattern),
+        ScoreMetaModel.title.ilike(pattern),
+        ScoreMetaModel.composer.ilike(pattern),
     )

@@ -6,15 +6,9 @@ from piano_app.domain.score.document.models.structural.rhythm import (
     RhythmicContainer,
     RhythmicContainerParent,
 )
-from piano_app.domain.score.document.services.helpers import (
-    Interval,
-    find_anchor_at,
-    global_position,
-)
-from piano_app.domain.score.document.services.helpers.searching import (
-    find_intersections,
-    locate_in_deepest_scope,
-)
+from piano_app.domain.score.document.services.geometry import Point, Span, overflow
+from piano_app.domain.score.document.services.geometry.score_geometry import ScoreGeometry
+from piano_app.domain.score.document.services.helpers import find_anchor_at
 from piano_app.domain.score.document.services.mutation.engine.buffer import EmitBuffer
 from piano_app.domain.score.document.services.mutation.engine.resolver import ResolveBound
 from piano_app.domain.score.document.services.mutation.instructions import (
@@ -74,21 +68,27 @@ class CreateLeafAnalyzer:
                 )
             )
 
-        # The returned interval carries the deepest scope and coordinates in that scope.
-        try:
-            interval: Interval = locate_in_deepest_scope(
-                scope=request.voice,
-                start=global_position(
-                    measure=request.measure,
-                    position=request.position,
-                ),
-                written_length=request.size.fraction,
-            )
-        except ValueError as error:
-            raise MutationRejectedError("Leaf straddles a group boundary.") from error
+        geometry: ScoreGeometry = ScoreGeometry(origin=request.measure)
+        target: Point = Point(
+            frame=geometry.of_measure(measure=request.measure),
+            value=request.position.value,
+        ).to(frame=geometry.root)
 
-        parent: RhythmicContainerParent = interval.scope
-        to_remove: list[RhythmicContainer] = find_intersections(interval=interval)
+        # the descent restates the point in whatever scope holds it; the requested size
+        # stays as written, since a size means the value written in the scope it lands in
+        parent: RhythmicContainerParent
+        local: Point
+        parent, local = geometry.deepest_scope_at(point=target, voice=request.voice)
+        placement: Span = Span(frame=local.frame, start=local.value, length=request.size.fraction)
+
+        # geometry only reports how far the leaf outgrows its scope — refusing it is this
+        # analyzer's own invariant, and it belongs here rather than down in the geometry
+        if overflow(span=placement) > 0:
+            raise MutationRejectedError("Leaf straddles a group boundary.")
+
+        to_remove: list[RhythmicContainer] = [
+            meeting.region for meeting in geometry.intersecting(span=placement, scope=parent)
+        ]
 
         for item in to_remove:
             if isinstance(item, LeafRhythmicContainer):

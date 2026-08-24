@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.dml import ReturningUpdate
 
-from piano_app.adapters.outbound.postgres.system.schema import ScoreContentORM, ScoreMetaORM
+from piano_app.adapters.outbound.postgres.system.schema import ScoreContentModel, ScoreMetaModel
 from piano_app.adapters.outbound.shared.codec import ScoreDocumentCodec
 from piano_app.application.ports.score.score_repository import (
     ScoreRepositoryNotFoundError,
@@ -29,42 +29,42 @@ class PostgresScoreRepository:
 
     async def get(self, *, score_id: str) -> Score | None:
         # get with the lattest version by default
-        statement: Select[tuple[ScoreMetaORM, ScoreContentORM]] = (
-            select(ScoreMetaORM, ScoreContentORM)
-            .join(ScoreContentORM, ScoreContentORM.score_id == ScoreMetaORM.id)
-            .where(ScoreMetaORM.id == score_id)
-            .order_by(ScoreContentORM.version.desc())
+        statement: Select[tuple[ScoreMetaModel, ScoreContentModel]] = (
+            select(ScoreMetaModel, ScoreContentModel)
+            .join(ScoreContentModel, ScoreContentModel.score_id == ScoreMetaModel.id)
+            .where(ScoreMetaModel.id == score_id)
+            .order_by(ScoreContentModel.version.desc())
             .limit(1)
         )
-        result: Result[tuple[ScoreMetaORM, ScoreContentORM]] = await self._session.execute(
+        result: Result[tuple[ScoreMetaModel, ScoreContentModel]] = await self._session.execute(
             statement
         )
-        row: Row[tuple[ScoreMetaORM, ScoreContentORM]] | None = result.one_or_none()
+        row: Row[tuple[ScoreMetaModel, ScoreContentModel]] | None = result.one_or_none()
 
         if row is None:
             return None
 
         return self._to_domain(
-            score_orm=row[0],
-            content_orm=row[1],
+            score_model=row[0],
+            content_model=row[1],
         )
 
     async def get_meta(self, *, score_id: str) -> ScoreMeta | None:
-        statement: Select[tuple[ScoreMetaORM]] = select(ScoreMetaORM).where(
-            ScoreMetaORM.id == score_id
+        statement: Select[tuple[ScoreMetaModel]] = select(ScoreMetaModel).where(
+            ScoreMetaModel.id == score_id
         )
 
-        result: ScalarResult[ScoreMetaORM] = await self._session.scalars(statement)
-        score_orm: ScoreMetaORM | None = result.one_or_none()
+        result: ScalarResult[ScoreMetaModel] = await self._session.scalars(statement)
+        score_model: ScoreMetaModel | None = result.one_or_none()
 
-        if score_orm is None:
+        if score_model is None:
             return None
 
-        return self._to_meta(score_orm=score_orm)
+        return self._to_meta(score_model=score_model)
 
     async def exists(self, *, score_id: str) -> bool:
         statement: Select[tuple[bool]] = select(
-            select(ScoreMetaORM.id).where(ScoreMetaORM.id == score_id).exists()
+            select(ScoreMetaModel.id).where(ScoreMetaModel.id == score_id).exists()
         )
 
         result: Result[tuple[bool]] = await self._session.execute(statement)
@@ -81,60 +81,60 @@ class PostgresScoreRepository:
         document: ScoreDocument,
         is_public: bool = False,
     ) -> Score:
-        score_orm: ScoreMetaORM = ScoreMetaORM(
+        score_model: ScoreMetaModel = ScoreMetaModel(
             title=title,
             author_id=author_id,
             composer=composer,
             derived_from_id=derived_from_id,
             is_public=is_public,
         )
-        self._session.add(score_orm)
+        self._session.add(score_model)
         await self._session.flush()
 
-        content_orm: ScoreContentORM = ScoreContentORM(
-            score_id=score_orm.id,
+        content_model: ScoreContentModel = ScoreContentModel(
+            score_id=score_model.id,
             version=1,
             document=self._codec.serialize(document),
         )
-        self._session.add(content_orm)
+        self._session.add(content_model)
         await self._session.flush()
 
         return self._to_domain(
-            score_orm=score_orm,
-            content_orm=content_orm,
+            score_model=score_model,
+            content_model=content_model,
         )
 
     async def update_content(self, *, score_id: str, document: ScoreDocument) -> None:
-        score_orm: ScoreMetaORM | None = await self._session.get(ScoreMetaORM, score_id)
-        if score_orm is None:
+        score_model: ScoreMetaModel | None = await self._session.get(ScoreMetaModel, score_id)
+        if score_model is None:
             raise ScoreRepositoryNotFoundError(score_id=score_id)
 
-        statement: Select[tuple[ScoreContentORM]] = (
-            select(ScoreContentORM)
-            .where(ScoreContentORM.score_id == score_id)
-            .order_by(ScoreContentORM.version.desc())
+        statement: Select[tuple[ScoreContentModel]] = (
+            select(ScoreContentModel)
+            .where(ScoreContentModel.score_id == score_id)
+            .order_by(ScoreContentModel.version.desc())
             .limit(1)
         )
-        result: ScalarResult[ScoreContentORM] = await self._session.scalars(statement)
-        current_content: ScoreContentORM | None = result.one_or_none()
+        result: ScalarResult[ScoreContentModel] = await self._session.scalars(statement)
+        current_content: ScoreContentModel | None = result.one_or_none()
 
         if current_content is None:
             raise RuntimeError(f"Score {score_id!r} has no content.")
 
         # increment version
-        content_orm: ScoreContentORM = ScoreContentORM(
+        content_model: ScoreContentModel = ScoreContentModel(
             score_id=score_id,
             version=current_content.version + 1,
             document=self._codec.serialize(document),
         )
-        self._session.add(content_orm)
+        self._session.add(content_model)
 
         # score existence is already checked, so the issue here is the unique constraint violation
         try:
             await self._session.flush()
         except IntegrityError:
             raise ScoreRepositoryVersionConflictError(
-                score_id=score_id, version=content_orm.version
+                score_id=score_id, version=content_model.version
             ) from None
 
     async def set_title(self, *, score_id: str, title: str) -> None:
@@ -151,10 +151,10 @@ class PostgresScoreRepository:
         settled by the caller (see the port). The only failure left here is the
         row having disappeared."""
         statement: ReturningUpdate[tuple[str]] = (
-            update(ScoreMetaORM)
-            .where(ScoreMetaORM.id == score_id)
+            update(ScoreMetaModel)
+            .where(ScoreMetaModel.id == score_id)
             .values(**values)
-            .returning(ScoreMetaORM.id)
+            .returning(ScoreMetaModel.id)
         )
         result: ScalarResult[str] = await self._session.scalars(statement)
 
@@ -162,25 +162,25 @@ class PostgresScoreRepository:
             raise ScoreRepositoryNotFoundError(score_id=score_id)
 
     @staticmethod
-    def _to_meta(*, score_orm: ScoreMetaORM) -> ScoreMeta:
+    def _to_meta(*, score_model: ScoreMetaModel) -> ScoreMeta:
         return ScoreMeta(
-            id=score_orm.id,
-            title=score_orm.title,
-            author_id=score_orm.author_id,
-            composer=score_orm.composer,
-            derived_from_id=score_orm.derived_from_id,
-            is_public=score_orm.is_public,
-            created_at=score_orm.created_at,
-            updated_at=score_orm.updated_at,
+            id=score_model.id,
+            title=score_model.title,
+            author_id=score_model.author_id,
+            composer=score_model.composer,
+            derived_from_id=score_model.derived_from_id,
+            is_public=score_model.is_public,
+            created_at=score_model.created_at,
+            updated_at=score_model.updated_at,
         )
 
     def _to_domain(
         self,
         *,
-        score_orm: ScoreMetaORM,
-        content_orm: ScoreContentORM,
+        score_model: ScoreMetaModel,
+        content_model: ScoreContentModel,
     ) -> Score:
         return Score(
-            meta=self._to_meta(score_orm=score_orm),
-            document=self._codec.deserialize(content_orm.document),
+            meta=self._to_meta(score_model=score_model),
+            document=self._codec.deserialize(content_model.document),
         )
