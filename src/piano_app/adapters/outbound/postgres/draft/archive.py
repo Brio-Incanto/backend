@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import Result, Row, ScalarResult, Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from piano_app.adapters.outbound.postgres.draft.schema import DraftContentORM, DraftMetaORM
+from piano_app.adapters.outbound.postgres.draft.schema import DraftContentModel, DraftMetaModel
 from piano_app.adapters.outbound.shared.codec import (
     ScoreDocumentCodec,
     SerializedScoreDocument,
@@ -32,7 +32,7 @@ class PostgresDraftArchive:
         document: ScoreDocument,
     ) -> DraftSnapshot:
         async with self._session_factory() as session:
-            meta: DraftMetaORM = DraftMetaORM(
+            meta: DraftMetaModel = DraftMetaModel(
                 title=title,
                 author_id=author_id,
                 score_id=ref_score_id,
@@ -40,7 +40,7 @@ class PostgresDraftArchive:
             session.add(meta)
             await session.flush()
 
-            content: DraftContentORM = DraftContentORM(
+            content: DraftContentModel = DraftContentModel(
                 id=meta.id,
                 revisions=[self._codec.serialize(document)],
                 cursor=0,
@@ -60,22 +60,22 @@ class PostgresDraftArchive:
                 self._codec.serialize(revision) for revision in snapshot.revisions
             ]
             updated_content_id: str | None = await session.scalar(
-                update(DraftContentORM)
+                update(DraftContentModel)
                 .where(
-                    DraftContentORM.id == snapshot.draft_id,
-                    DraftContentORM.version < snapshot.version,
+                    DraftContentModel.id == snapshot.draft_id,
+                    DraftContentModel.version < snapshot.version,
                 )
                 .values(
                     revisions=revisions,
                     cursor=snapshot.cursor,
                     version=snapshot.version,
                 )
-                .returning(DraftContentORM.id)
+                .returning(DraftContentModel.id)
             )
             if updated_content_id is not None:
                 await session.execute(
-                    update(DraftMetaORM)
-                    .where(DraftMetaORM.id == snapshot.draft_id)
+                    update(DraftMetaModel)
+                    .where(DraftMetaModel.id == snapshot.draft_id)
                     .values(updated_at=func.now())
                 )
                 await session.commit()
@@ -83,20 +83,22 @@ class PostgresDraftArchive:
 
             # check if the draft is non-existent or simply a version has already moved forward
             stored_id: str | None = await session.scalar(
-                select(DraftMetaORM.id).where(DraftMetaORM.id == snapshot.draft_id)
+                select(DraftMetaModel.id).where(DraftMetaModel.id == snapshot.draft_id)
             )
             if stored_id is None:
                 raise DraftStoreNotFoundError(draft_id=snapshot.draft_id)
 
     async def get_snapshot(self, *, draft_id: str) -> DraftSnapshot | None:
         async with self._session_factory() as session:
-            statement: Select[tuple[DraftMetaORM, DraftContentORM]] = (
-                select(DraftMetaORM, DraftContentORM)
-                .join(DraftContentORM, DraftContentORM.id == DraftMetaORM.id)
-                .where(DraftMetaORM.id == draft_id)
+            statement: Select[tuple[DraftMetaModel, DraftContentModel]] = (
+                select(DraftMetaModel, DraftContentModel)
+                .join(DraftContentModel, DraftContentModel.id == DraftMetaModel.id)
+                .where(DraftMetaModel.id == draft_id)
             )
-            result: Result[tuple[DraftMetaORM, DraftContentORM]] = await session.execute(statement)
-            result_row: Row[tuple[DraftMetaORM, DraftContentORM]] | None = result.one_or_none()
+            result: Result[tuple[DraftMetaModel, DraftContentModel]] = await session.execute(
+                statement
+            )
+            result_row: Row[tuple[DraftMetaModel, DraftContentModel]] | None = result.one_or_none()
 
             if result_row is None:
                 return None
@@ -108,17 +110,17 @@ class PostgresDraftArchive:
 
     async def list_by_author(self, *, author_id: str) -> Sequence[DraftMeta]:
         async with self._session_factory() as session:
-            statement: Select[tuple[DraftMetaORM]] = select(DraftMetaORM).where(
-                DraftMetaORM.author_id == author_id
+            statement: Select[tuple[DraftMetaModel]] = select(DraftMetaModel).where(
+                DraftMetaModel.author_id == author_id
             )
-            result: ScalarResult[DraftMetaORM] = await session.scalars(statement)
+            result: ScalarResult[DraftMetaModel] = await session.scalars(statement)
             return [row.to_meta() for row in result.all()]
 
     def _to_snapshot(
         self,
         *,
-        meta: DraftMetaORM,
-        content: DraftContentORM,
+        meta: DraftMetaModel,
+        content: DraftContentModel,
     ) -> DraftSnapshot:
         return DraftSnapshot.create(
             draft_id=meta.id,

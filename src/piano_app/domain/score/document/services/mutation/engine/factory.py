@@ -1,3 +1,8 @@
+from piano_app.domain.score.document.services.mutation.engine.analyzers.context import (
+    CreateClefChangeAnalyzer,
+    CreateKeySignatureChangeAnalyzer,
+    DeleteContextAnalyzer,
+)
 from piano_app.domain.score.document.services.mutation.engine.analyzers.material import (
     CreateNoteAnalyzer,
     CreateNoteCarrierAnalyzer,
@@ -22,6 +27,11 @@ from piano_app.domain.score.document.services.mutation.engine.analyzers.temporal
     DeleteTemporalAnchorAnalyzer,
 )
 from piano_app.domain.score.document.services.mutation.engine.engine import MutationEngine
+from piano_app.domain.score.document.services.mutation.engine.handlers.context import (
+    CreateClefChangeHandler,
+    CreateKeySignatureChangeHandler,
+    DeleteContextHandler,
+)
 from piano_app.domain.score.document.services.mutation.engine.handlers.material import (
     CreateNoteCarrierHandler,
     CreateNoteHandler,
@@ -54,6 +64,11 @@ from piano_app.domain.score.document.services.mutation.engine.registry import (
     MutationAnalyzerRegistry,
     MutationHandlerRegistry,
 )
+from piano_app.domain.score.document.services.mutation.instructions.actions.context import (
+    CreateClefChangeAction,
+    CreateKeySignatureChangeAction,
+    DeleteContextAction,
+)
 from piano_app.domain.score.document.services.mutation.instructions.actions.material import (
     CreateNoteAction,
     CreateNoteCarrierAction,
@@ -76,6 +91,11 @@ from piano_app.domain.score.document.services.mutation.instructions.actions.rhyt
 from piano_app.domain.score.document.services.mutation.instructions.actions.temporal import (
     CreateTemporalAnchorAction,
     DeleteTemporalAnchorAction,
+)
+from piano_app.domain.score.document.services.mutation.instructions.requests.context import (
+    CreateClefChangeRequest,
+    CreateKeySignatureChangeRequest,
+    DeleteContextRequest,
 )
 from piano_app.domain.score.document.services.mutation.instructions.requests.material import (
     CreateNoteCarrierRequest,
@@ -129,6 +149,12 @@ def _build_analyzer_registry() -> MutationAnalyzerRegistry:
         request_type=DeleteTemporalAnchorRequest,
         analyzer=DeleteTemporalAnchorAnalyzer(),
     )
+    registry.register(request_type=CreateClefChangeRequest, analyzer=CreateClefChangeAnalyzer())
+    registry.register(
+        request_type=CreateKeySignatureChangeRequest,
+        analyzer=CreateKeySignatureChangeAnalyzer(),
+    )
+    registry.register(request_type=DeleteContextRequest, analyzer=DeleteContextAnalyzer())
 
     return registry
 
@@ -151,6 +177,12 @@ def _build_handler_registry() -> MutationHandlerRegistry:
     registry.register(action_type=DeleteRhythmicGroupAction, handler=DeleteRhythmicGroupHandler())
     registry.register(action_type=CreateTemporalAnchorAction, handler=CreateTemporalAnchorHandler())
     registry.register(action_type=DeleteTemporalAnchorAction, handler=DeleteTemporalAnchorHandler())
+    registry.register(action_type=CreateClefChangeAction, handler=CreateClefChangeHandler())
+    registry.register(
+        action_type=CreateKeySignatureChangeAction,
+        handler=CreateKeySignatureChangeHandler(),
+    )
+    registry.register(action_type=DeleteContextAction, handler=DeleteContextHandler())
 
     return registry
 

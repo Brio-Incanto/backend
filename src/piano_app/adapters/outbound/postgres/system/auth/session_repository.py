@@ -8,7 +8,7 @@ from sqlalchemy import ScalarResult, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.dml import Delete, ReturningUpdate
 
-from piano_app.adapters.outbound.postgres.system.schema import AuthSessionORM
+from piano_app.adapters.outbound.postgres.system.schema import AuthSessionModel
 from piano_app.application.ports.auth.refresh_session_repository import (
     RotatedRefreshSession,
 )
@@ -61,14 +61,14 @@ class PostgresRefreshSessionRepository:
     async def create(self, *, user_id: str) -> str:
         secret: str = secrets.token_urlsafe(self._TOKEN_ENTROPY_BYTES)
 
-        orm: AuthSessionORM = AuthSessionORM(
+        session_model: AuthSessionModel = AuthSessionModel(
             user_id=user_id,
             refresh_token_hash=self._hash(secret=secret),
             expires_at=datetime.now(UTC) + self._ttl,
         )
-        self._session.add(orm)
+        self._session.add(session_model)
         await self._session.flush()
-        session_id: str = orm.id
+        session_id: str = session_model.id
 
         return str(_RefreshCredential.create(session_id=session_id, secret=secret))
 
@@ -82,17 +82,17 @@ class PostgresRefreshSessionRepository:
         new_secret: str = secrets.token_urlsafe(self._TOKEN_ENTROPY_BYTES)
 
         statement: ReturningUpdate[tuple[str]] = (
-            update(AuthSessionORM)
+            update(AuthSessionModel)
             .where(
-                AuthSessionORM.id == old_credential.session_id,
-                AuthSessionORM.refresh_token_hash == self._hash(secret=old_credential.secret),
-                AuthSessionORM.expires_at > datetime.now(UTC),
+                AuthSessionModel.id == old_credential.session_id,
+                AuthSessionModel.refresh_token_hash == self._hash(secret=old_credential.secret),
+                AuthSessionModel.expires_at > datetime.now(UTC),
             )
             .values(
                 refresh_token_hash=self._hash(secret=new_secret),
                 expires_at=datetime.now(UTC) + self._ttl,
             )
-            .returning(AuthSessionORM.user_id)
+            .returning(AuthSessionModel.user_id)
         )
 
         result: ScalarResult[str] = await self._session.scalars(statement)
@@ -115,9 +115,9 @@ class PostgresRefreshSessionRepository:
         except ValueError:
             return
 
-        statement: Delete = delete(AuthSessionORM).where(
-            AuthSessionORM.id == cred.session_id,
-            AuthSessionORM.refresh_token_hash == self._hash(secret=cred.secret),
+        statement: Delete = delete(AuthSessionModel).where(
+            AuthSessionModel.id == cred.session_id,
+            AuthSessionModel.refresh_token_hash == self._hash(secret=cred.secret),
         )
         await self._session.execute(statement)
 

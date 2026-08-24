@@ -19,7 +19,7 @@ from piano_app.adapters.outbound.shared.codec import SerializedScoreDocument
 from .base import Base
 
 
-class UserORM(Base):
+class UserModel(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(
@@ -34,7 +34,7 @@ class UserORM(Base):
     bio: Mapped[str | None] = mapped_column(String)
 
 
-class ScoreMetaORM(Base):
+class ScoreMetaModel(Base):
     __tablename__ = "scores"
 
     id: Mapped[str] = mapped_column(
@@ -71,7 +71,7 @@ class ScoreMetaORM(Base):
     )
 
 
-class ScoreContentORM(Base):
+class ScoreContentModel(Base):
     __tablename__ = "score_contents"
     __table_args__ = (
         UniqueConstraint(
@@ -101,7 +101,7 @@ class ScoreContentORM(Base):
 
 # addition of several versions of a score to a collection should be
 # prohibited at the repository level
-class CollectionScoreORM(Base):
+class CollectionScoreModel(Base):
     __tablename__ = "collection_scores"
 
     __table_args__ = (
@@ -140,7 +140,7 @@ class CollectionScoreORM(Base):
     )
 
 
-class CollectionORM(Base):
+class CollectionModel(Base):
     __tablename__ = "collections"
 
     id: Mapped[str] = mapped_column(

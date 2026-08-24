@@ -4,15 +4,11 @@ from fractions import Fraction
 
 from piano_app.domain.score.document.models.material import NoteCarrier, RestCarrier
 from piano_app.domain.score.document.models.material.primitive import MusicalItem
-from piano_app.domain.score.document.models.structural import Measure, MeasurePosition, Staff, Voice
+from piano_app.domain.score.document.models.structural import Staff, Voice
 from piano_app.domain.score.document.models.structural.rhythm import LeafRhythmicContainer
-from piano_app.domain.score.document.services.helpers import (
-    Interval,
-    global_position,
-    interval_in_parent_scope,
-    iter_leaves,
-    translate_to_root,
-)
+from piano_app.domain.score.document.services.geometry import Point, Span
+from piano_app.domain.score.document.services.geometry.score_geometry import ScoreGeometry
+from piano_app.domain.score.document.services.helpers import iter_leaves
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -43,13 +39,17 @@ class StaffResolver:
     def resolve(
         self,
         *,
+        geometry: ScoreGeometry,
         voice: Voice,
-        measure: Measure,
-        position: MeasurePosition,
+        at: Point,
     ) -> StaffPlacement:
-        target: Fraction = global_position(measure=measure, position=position)
+        target: Fraction = at.to(frame=geometry.root).value
 
-        observations: list[_Observation] = self._observe(voice=voice, target=target)
+        observations: list[_Observation] = self._observe(
+            geometry=geometry,
+            voice=voice,
+            target=target,
+        )
         if not observations:
             raise ValueError("Cannot resolve a staff for an empty voice.")
 
@@ -77,15 +77,29 @@ class StaffResolver:
 
         return weighted / total_weight
 
-    def _observe(self, *, voice: Voice, target: Fraction) -> list[_Observation]:
+    def _observe(
+        self,
+        *,
+        geometry: ScoreGeometry,
+        voice: Voice,
+        target: Fraction,
+    ) -> list[_Observation]:
         nearest: list[LeafRhythmicContainer] = sorted(
             iter_leaves(voice),
-            key=lambda container: self._distance_to_gap(leaf=container, target=target),
+            key=lambda container: self._distance_to_gap(
+                geometry=geometry,
+                leaf=container,
+                target=target,
+            ),
         )[: self._WINDOW]
 
         observations: list[_Observation] = []
         for leaf in nearest:
-            distance: Fraction = self._distance_to_gap(leaf=leaf, target=target)
+            distance: Fraction = self._distance_to_gap(
+                geometry=geometry,
+                leaf=leaf,
+                target=target,
+            )
             proximity: Fraction = Fraction(1) / (1 + distance)
             observations.extend(self._observe_leaf(leaf=leaf, proximity=proximity))
 
@@ -109,10 +123,15 @@ class StaffResolver:
         return observations
 
     @staticmethod
-    def _distance_to_gap(*, leaf: LeafRhythmicContainer, target: Fraction) -> Fraction:
+    def _distance_to_gap(
+        *,
+        geometry: ScoreGeometry,
+        leaf: LeafRhythmicContainer,
+        target: Fraction,
+    ) -> Fraction:
         # measure against the leaf's whole global span, not just its start, so a long note
         # ending right at the gap counts as adjacent (distance 0) instead of being penalized
-        span: Interval = translate_to_root(interval=interval_in_parent_scope(container=leaf))
+        span: Span = geometry.global_span_of(container=leaf)
         if span.start <= target <= span.end:
             return Fraction(0)
         if target < span.start:

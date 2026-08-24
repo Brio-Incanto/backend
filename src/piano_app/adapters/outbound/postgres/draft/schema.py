@@ -17,7 +17,7 @@ class DraftBase(DeclarativeBase):
 draft_metadata: MetaData = DraftBase.metadata
 
 
-class DraftMetaORM(DraftBase):
+class DraftMetaModel(DraftBase):
     """System database metadata for drafts."""
 
     __tablename__ = "draft_meta"
@@ -53,7 +53,7 @@ class DraftMetaORM(DraftBase):
         )
 
 
-class DraftContentORM(DraftBase):
+class DraftContentModel(DraftBase):
     """Cold-tier draft state stored independently from the system database."""
 
     __tablename__ = "draft_contents"

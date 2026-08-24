@@ -1,0 +1,5 @@
+Independent migration environment for the PostgreSQL cold draft archive.
+
+Run migrations with:
+
+    alembic -c alembic-draft.ini upgrade head

@@ -9,19 +9,6 @@ from piano_app.domain.score.document import ScoreDocument
 class DraftSnapshot:
     """A draft's whole restorable state — its author and undo/redo history,
     mirroring the hot tier one-to-one.
-
-    A plain value model, NOT a domain entity: revisions+cursor is undo/redo
-    bookkeeping, not a business concept (the domain has `Score`/`ScoreDocument`,
-    no `Draft`). Carries domain `ScoreDocument` objects, not serialized dicts —
-    serialization is each adapter's internal business, so the snapshot stays
-    framework-free at the port boundary. It's the currency of the cold tier
-    (`DraftArchive`) and of spill/hydrate between tiers; the hot tier still moves
-    the cursor as its own atomic op (undo/redo), it does NOT round-trip a whole
-    snapshot per move.
-
-    Lives in `shared/` (not with the tiering protocols) because several adapters
-    depend on it — `tiered_draft_history` speaks it, the Postgres cold adapter
-    produces it — so it must not be owned by any one adapter file.
     """
 
     draft_id: str
